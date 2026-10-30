@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { reconcileWithServer } from "./reconcile";
 import { emptyScore, scoreAfterGrid, scoreBreakdown } from "./scoring";
 import type { GameView } from "./server/game";

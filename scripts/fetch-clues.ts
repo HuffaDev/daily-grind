@@ -1,5 +1,5 @@
 // Maintenance script — NOT run at build or runtime. Re-run manually
-// (`npx tsx scripts/fetch-clues.ts`) if you want to refresh/expand the
+// (`bun scripts/fetch-clues.ts`) if you want to refresh/expand the
 // generated word bank from Datamuse. Output is written pre-sorted.
 import { writeFileSync } from "fs";
 import { WORDS_2, WORDS_3, WORDS_4, WORDS_5 } from "../src/lib/wordbank";

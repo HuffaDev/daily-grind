@@ -24,10 +24,12 @@ The day, and the board with it, resets at 00:00 UTC. If the Activity is open at 
 
 ## Development
 
+The project uses [Bun](https://bun.com) 1.4 for everything: installing, scripts, tests, and as the runtime on Vercel (`bunVersion` in `vercel.json`). The `--bun` flag in the `package.json` scripts makes Next.js run on Bun instead of Node.
+
 ```bash
-npm install
-npm run dev
-npm test     # scoring, sync and server tests (Vitest)
+bun install
+bun run dev
+bun test     # scoring, sync and server tests
 ```
 
 In a normal browser the game runs fully locally. With no Redis configured, the API uses an in-memory store.
@@ -42,7 +44,7 @@ In a normal browser the game runs fully locally. With no Redis configured, the A
 4. **Activities → Settings**: enable Activities.
 5. Deploy to Vercel. Add the Upstash Redis integration and set the variables from `.env.example`.
 
-For local testing inside Discord, expose `npm run dev` through a tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) and point the `/` mapping at it. `next.config.ts` already allows `*.discordsays.com` as a dev origin, which the dev server needs to accept requests coming through Discord.
+For local testing inside Discord, expose `bun run dev` through a tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) and point the `/` mapping at it. `next.config.ts` already allows `*.discordsays.com` as a dev origin, which the dev server needs to accept requests coming through Discord.
 
 ## Changing the word bank or generator
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getUtcDateKey } from "@/lib/daily";
 import { getPuzzleId } from "@/lib/generator";
 import { emptyGrid, gridWithSlot, puzzleFor, solutionGrid, wrongLetterAt } from "@/lib/testUtils";

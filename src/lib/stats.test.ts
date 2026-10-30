@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { applyGame, DEFAULT_STATS, previousDateKey } from "./stats";
 
 const win = (timeSeconds: number) => ({ won: true, timeSeconds });
