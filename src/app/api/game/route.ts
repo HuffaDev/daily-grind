@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     action?: GameAction;
     grid?: unknown;
     elapsedSeconds?: unknown;
+    cells?: unknown;
   };
   if (!body.action || !ACTIONS.includes(body.action)) {
     return Response.json({ error: "Invalid action" }, { status: 400 });

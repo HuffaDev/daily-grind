@@ -81,24 +81,34 @@ export function scoreAfterGrid(
   };
 }
 
-/** Returns the filled-in cells that are wrong, and the record with the Check penalty applied. */
+/**
+ * Checks the filled-in cells in `cells` (keys like "2,3"; every cell if
+ * omitted). Returns which are wrong and which are right, and the record with
+ * the Check penalty applied for the wrong ones.
+ */
 export function scoreAfterCheck(
   puzzle: Puzzle,
   record: ScoreRecord,
-  grid: string[][]
-): { record: ScoreRecord; wrongCells: string[] } {
+  grid: string[][],
+  cells?: readonly string[]
+): { record: ScoreRecord; wrongCells: string[]; correctCells: string[] } {
+  const scope = cells ? new Set(cells) : null;
   const wrongCells: string[] = [];
+  const correctCells: string[] = [];
   for (const row of puzzle.cells) {
     for (const cell of row) {
-      if (cell.black) continue;
+      const k = key(cell.row, cell.col);
+      if (cell.black || (scope && !scope.has(k))) continue;
       const val = grid[cell.row]?.[cell.col];
-      if (val && val !== cell.solution) wrongCells.push(key(cell.row, cell.col));
+      if (!val) continue;
+      (val === cell.solution ? correctCells : wrongCells).push(k);
     }
   }
-  if (record.revealed || record.solvedTimeSeconds !== null) return { record, wrongCells };
+  if (record.revealed || record.solvedTimeSeconds !== null) return { record, wrongCells, correctCells };
   return {
     record: { ...record, checkPenalty: record.checkPenalty + CHECK_PENALTY_PER_CELL * wrongCells.length },
     wrongCells,
+    correctCells,
   };
 }
 

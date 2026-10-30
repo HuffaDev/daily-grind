@@ -7,8 +7,8 @@ import { formatTime } from "@/lib/puzzleUtils";
 interface Props {
   connection: DiscordConnection;
   puzzleId: string;
-  /** The player's own points; a change triggers an immediate refresh. */
-  myPoints: number;
+  /** The player's points as the server last saved them; a change triggers an immediate refresh. */
+  myPoints: number | null;
 }
 
 const POLL_MS = 10_000;
@@ -60,14 +60,7 @@ export default function Leaderboard({ connection, puzzleId, myPoints }: Props) {
                 className={`flex items-center gap-3 px-3 py-2 ${isMe ? "bg-amber-50 dark:bg-amber-950/40" : ""}`}
               >
                 <span className="w-5 text-right tabular-nums text-neutral-500 dark:text-neutral-400">{i + 1}</span>
-                {/* eslint-disable-next-line @next/next/no-img-element -- proxied Discord CDN, not optimizable by next/image */}
-                <img
-                  src={avatarUrl(entry.userId, entry.avatarPath)}
-                  alt=""
-                  width={24}
-                  height={24}
-                  className="rounded-full"
-                />
+                <Avatar entry={entry} />
                 <span className="flex-1 truncate font-medium text-neutral-900 dark:text-neutral-50">{entry.name}</span>
                 <span className="text-xs text-neutral-500 dark:text-neutral-400 tabular-nums">
                   {entry.solvedTimeSeconds !== null
@@ -85,5 +78,28 @@ export default function Leaderboard({ connection, puzzleId, myPoints }: Props) {
         </ol>
       )}
     </section>
+  );
+}
+
+/** The player's Discord avatar, or their initial if the image can't load. */
+function Avatar({ entry }: { entry: BoardEntry }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="size-6 shrink-0 rounded-full bg-neutral-300 dark:bg-neutral-700 flex items-center justify-center text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+        {entry.name.slice(0, 1).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- proxied Discord avatar, not optimizable by next/image
+    <img
+      src={avatarUrl(entry.userId, entry.avatarPath)}
+      alt=""
+      width={24}
+      height={24}
+      onError={() => setFailed(true)}
+      className="size-6 shrink-0 rounded-full object-cover"
+    />
   );
 }

@@ -87,6 +87,7 @@ export class GameApiError extends Error {
 
 async function request<T>(conn: DiscordConnection, path: string, init?: RequestInit, retried = false): Promise<T> {
   const res = await fetch(path, {
+    cache: "no-store",
     ...init,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${conn.session}`, ...init?.headers },
   });
@@ -102,7 +103,7 @@ async function request<T>(conn: DiscordConnection, path: string, init?: RequestI
 
 export function postGameAction(
   conn: DiscordConnection,
-  body: { puzzleId: string; action: GameAction; grid?: string[][]; elapsedSeconds?: number }
+  body: { puzzleId: string; action: GameAction; grid?: string[][]; elapsedSeconds?: number; cells?: string[] }
 ): Promise<{ game: GameView | null; wrongCells?: string[] }> {
   return request(conn, "/api/game", { method: "POST", body: JSON.stringify(body) });
 }
@@ -116,11 +117,11 @@ export async function fetchLeaderboard(conn: DiscordConnection, puzzleId: string
 }
 
 /**
- * Avatar images live on cdn.discordapp.com, which the Activity sandbox can only
- * reach through the "/discord-cdn" URL mapping set up in the Developer Portal.
+ * Avatar images live on cdn.discordapp.com, which the Activity sandbox can't
+ * reach directly, so they are fetched through our own /api/avatar route.
  */
 export function avatarUrl(userId: string, avatarPath: string | null): string {
-  if (avatarPath) return `/discord-cdn/${avatarPath}?size=64`;
   const defaultIndex = Number((BigInt(userId) >> BigInt(22)) % BigInt(6));
-  return `/discord-cdn/embed/avatars/${defaultIndex}.png`;
+  const path = avatarPath ?? `embed/avatars/${defaultIndex}.png`;
+  return `/api/avatar?path=${encodeURIComponent(path)}`;
 }

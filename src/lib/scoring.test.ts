@@ -59,6 +59,24 @@ describe("scoring a game", () => {
     expect(scoreAfterCheck(puzzle, solved, grid).record.checkPenalty).toBe(0);
   });
 
+  it("checks only the given cells, reporting right and wrong letters", () => {
+    const slot = puzzle.slots[0];
+    const grid = gridWithSlot(puzzle, slot);
+    const [[r0, c0], [r1, c1]] = slot.cellCoords;
+    grid[r1][c1] = wrongLetterAt(puzzle, r1, c1);
+    const word = slot.cellCoords.map(([r, c]) => `${r},${c}`);
+
+    const letter = scoreAfterCheck(puzzle, emptyScore(), grid, [`${r0},${c0}`]);
+    expect(letter.correctCells).toEqual([`${r0},${c0}`]);
+    expect(letter.wrongCells).toEqual([]);
+    expect(letter.record.checkPenalty).toBe(0);
+
+    const whole = scoreAfterCheck(puzzle, emptyScore(), grid, word);
+    expect(whole.wrongCells).toEqual([`${r1},${c1}`]);
+    expect(whole.correctCells).toHaveLength(word.length - 1);
+    expect(whole.record.checkPenalty).toBe(5);
+  });
+
   it("keeps earned words after Reveal but gives no bonuses for the revealed grid", () => {
     const slot = puzzle.slots[0];
     let score = scoreAfterGrid(puzzle, emptyScore(), gridWithSlot(puzzle, slot), 5);

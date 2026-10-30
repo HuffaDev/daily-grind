@@ -52,6 +52,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
   const [selected, setSelected] = useState({ row: 0, col: 0 });
   const [direction, setDirection] = useState<Direction>("across");
   const [wrongCells, setWrongCells] = useState<Set<string>>(new Set());
+  const [lockedCells, setLockedCells] = useState<Set<string>>(new Set());
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [complete, setComplete] = useState(false);
@@ -65,6 +66,9 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
   const [connection, setConnection] = useState<DiscordConnection | null>(null);
   const [serverSynced, setServerSynced] = useState(false);
   const [serverNotice, setServerNotice] = useState<string | null>(null);
+  // Points as last saved by the server; the leaderboard refreshes when they
+  // change, so it never fetches before the server has the new score.
+  const [serverPoints, setServerPoints] = useState<number | null>(null);
 
   const gridRef = useRef<CrosswordGridHandle>(null);
   // Set by player edits, so loading or syncing a grid never counts as playing.
@@ -86,6 +90,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     setElapsed(progress.elapsedSeconds);
     setComplete(progress.complete);
     setScore(progress.score);
+    setLockedCells(new Set(progress.lockedCells));
     setStats(loadStats(dateKey));
     setProgressLoaded(true);
     const first = firstWhiteCell();
@@ -105,8 +110,19 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
   // (otherwise we'd immediately overwrite saved progress with the defaults).
   useEffect(() => {
     if (!progressLoaded) return;
-    saveDailyProgress({ puzzleId, userGrid, elapsedSeconds: elapsed, complete, score });
-  }, [progressLoaded, puzzleId, userGrid, elapsed, complete, score]);
+    saveDailyProgress({ puzzleId, userGrid, elapsedSeconds: elapsed, complete, score, lockedCells: [...lockedCells] });
+  }, [progressLoaded, puzzleId, userGrid, elapsed, complete, score, lockedCells]);
+
+  // A lock only holds while its letter is still right (a synced grid from
+  // another device can differ), so a stale lock never traps a wrong letter.
+  const locked = useMemo(() => {
+    const result = new Set<string>();
+    for (const k of lockedCells) {
+      const [r, c] = k.split(",").map(Number);
+      if (userGrid[r]?.[c] && userGrid[r][c] === puzzle.cells[r]?.[c]?.solution) result.add(k);
+    }
+    return result;
+  }, [lockedCells, userGrid, puzzle]);
 
   // Inside Discord, sign in so progress counts toward the server's leaderboard.
   // In a plain browser the game stays fully local.
@@ -139,6 +155,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         setElapsed(merged.elapsedSeconds);
         setScore(merged.score);
         setComplete(isComplete(puzzle, merged.grid));
+        if (game) setServerPoints(game.points);
         if (merged.upload === "none") return;
         const res = await postGameAction(connection, {
           puzzleId,
@@ -146,8 +163,11 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
           grid: merged.grid,
           elapsedSeconds: merged.elapsedSeconds,
         });
-        const serverScore = res.game?.score;
-        if (serverScore && !cancelled) setScore((prev) => mergeScore(prev, serverScore));
+        if (res.game && !cancelled) {
+          const serverScore = res.game.score;
+          setScore((prev) => mergeScore(prev, serverScore));
+          setServerPoints(res.game.points);
+        }
       })
       .catch(handleServerError)
       .finally(() => {
@@ -159,7 +179,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
   }, [connection, progressLoaded, serverSynced, puzzleId, puzzle, handleServerError]);
 
   const sendAction = useCallback(
-    (action: "progress" | "check" | "reveal", grid?: string[][]) => {
+    (action: "progress" | "check" | "reveal", grid?: string[][], cells?: string[]) => {
       if (!connection || !serverSynced) return;
       queueRef.current = queueRef.current.then(async () => {
         try {
@@ -169,9 +189,13 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
             // Read when the request actually goes out, so queued progress sends the newest grid.
             grid: grid ?? latestRef.current.userGrid,
             elapsedSeconds: latestRef.current.elapsed,
+            cells,
           });
-          const serverScore = res.game?.score;
-          if (serverScore) setScore((prev) => mergeScore(prev, serverScore));
+          if (res.game) {
+            const serverScore = res.game.score;
+            setScore((prev) => mergeScore(prev, serverScore));
+            setServerPoints(res.game.points);
+          }
         } catch (err) {
           handleServerError(err);
         }
@@ -225,11 +249,12 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         puzzleNumber,
         timeSeconds: finishTime,
         revealed,
+        solvedWords: score.solvedWords,
         points: breakdown.total,
         // Discord's share dialog attaches the Activity link itself.
         url: typeof window !== "undefined" && !isInDiscord() ? window.location.href : undefined,
       }),
-    [puzzle, puzzleNumber, finishTime, revealed, breakdown.total]
+    [puzzle, puzzleNumber, finishTime, revealed, score.solvedWords, breakdown.total]
   );
 
   const handleShare = useMemo(
@@ -315,6 +340,11 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
   const handleType = useCallback(
     (r: number, c: number, letter: string) => {
       if (complete) return;
+      // A Check-confirmed letter can't be overwritten; typing just moves past it.
+      if (locked.has(key(r, c))) {
+        advance(r, c);
+        return;
+      }
       editedRef.current = true;
       setRunning(true);
       setUserGrid((prev) => {
@@ -325,14 +355,14 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
       clearWrong(r, c);
       advance(r, c);
     },
-    [complete, clearWrong, advance]
+    [complete, locked, clearWrong, advance]
   );
 
   const handleBackspace = useCallback(
     (r: number, c: number) => {
       if (complete) return;
       editedRef.current = true;
-      if (userGrid[r]?.[c]) {
+      if (userGrid[r]?.[c] && !locked.has(key(r, c))) {
         setUserGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[r][c] = "";
@@ -346,16 +376,18 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
       const idx = slot.cellCoords.findIndex(([rr, cc]) => rr === r && cc === c);
       if (idx > 0) {
         const [pr, pc] = slot.cellCoords[idx - 1];
-        setUserGrid((prev) => {
-          const next = prev.map((row) => [...row]);
-          next[pr][pc] = "";
-          return next;
-        });
+        if (!locked.has(key(pr, pc))) {
+          setUserGrid((prev) => {
+            const next = prev.map((row) => [...row]);
+            next[pr][pc] = "";
+            return next;
+          });
+        }
         setSelected({ row: pr, col: pc });
         gridRef.current?.focusCell(pr, pc);
       }
     },
-    [complete, userGrid, maps, direction, clearWrong]
+    [complete, userGrid, locked, maps, direction, clearWrong]
   );
 
   const handleArrow = useCallback(
@@ -410,6 +442,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         handleBackspace(r, c);
       } else if (k === "Delete") {
         e.preventDefault();
+        if (locked.has(key(r, c))) return;
         editedRef.current = true;
         setUserGrid((prev) => {
           const next = prev.map((row) => [...row]);
@@ -428,7 +461,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         handleCellSelect(r, c);
       }
     },
-    [handleType, handleBackspace, handleArrow, handleTab, handleCellSelect, clearWrong]
+    [handleType, handleBackspace, handleArrow, handleTab, handleCellSelect, clearWrong, locked]
   );
 
   const selectSlot = useCallback((slot: Slot) => {
@@ -437,12 +470,35 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     gridRef.current?.focusCell(slot.row, slot.col);
   }, []);
 
-  const handleCheck = useCallback(() => {
-    const result = scoreAfterCheck(puzzle, score, userGrid);
-    setWrongCells(new Set(result.wrongCells));
-    setScore(result.record);
-    sendAction("check", userGrid);
-  }, [puzzle, score, userGrid, sendAction]);
+  /** Marks wrong letters among `cells` in red and locks the correct ones. */
+  const checkCells = useCallback(
+    (cells: string[]) => {
+      // Clicking the button took focus from the grid; give it back so typing continues.
+      gridRef.current?.focusCell(selected.row, selected.col);
+      const unchecked = cells.filter((k) => !locked.has(k));
+      if (unchecked.length === 0) return;
+      const result = scoreAfterCheck(puzzle, score, userGrid, unchecked);
+      setWrongCells((prev) => {
+        const next = new Set(prev);
+        for (const k of unchecked) next.delete(k);
+        for (const k of result.wrongCells) next.add(k);
+        return next;
+      });
+      setLockedCells((prev) => new Set([...prev, ...result.correctCells]));
+      setScore(result.record);
+      sendAction("check", userGrid, unchecked);
+    },
+    [puzzle, score, userGrid, locked, selected, sendAction]
+  );
+
+  const handleCheckLetter = useCallback(
+    () => checkCells([key(selected.row, selected.col)]),
+    [checkCells, selected]
+  );
+
+  const handleCheckWord = useCallback(() => {
+    if (activeSlot) checkCells(activeSlot.cellCoords.map(([r, c]) => key(r, c)));
+  }, [checkCells, activeSlot]);
 
   const handleReveal = useCallback(() => {
     const solved = puzzle.cells.map((row) => row.map((cell) => (cell.black ? "" : cell.solution)));
@@ -482,8 +538,21 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
               <span className="font-mono tabular-nums text-neutral-700 dark:text-neutral-300 w-12 text-center">
                 {formatTime(elapsed)}
               </span>
-              <button type="button" onClick={handleCheck} className={buttonClass}>
-                Check
+              <button
+                type="button"
+                onClick={handleCheckLetter}
+                className={buttonClass}
+                title="Check the selected letter (−5 if wrong)"
+              >
+                Check letter
+              </button>
+              <button
+                type="button"
+                onClick={handleCheckWord}
+                className={buttonClass}
+                title="Check the highlighted word (−5 per wrong letter)"
+              >
+                Check word
               </button>
               <button type="button" onClick={handleReveal} className={buttonClass}>
                 Reveal
@@ -551,6 +620,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
           selected={selected}
           highlighted={highlighted}
           wrongCells={wrongCells}
+          lockedCells={locked}
           locked={complete}
           onSelect={handleCellSelect}
           onKeyDown={handleKeyDown}
@@ -572,7 +642,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         </span>
       </div>
 
-      {connection && <Leaderboard connection={connection} puzzleId={puzzleId} myPoints={breakdown.total} />}
+      {connection && <Leaderboard connection={connection} puzzleId={puzzleId} myPoints={serverPoints} />}
 
       {showWin && (
         <WinModal

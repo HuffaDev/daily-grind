@@ -59,6 +59,16 @@ function sanitizeGrid(grid: unknown, size: number): string[][] {
   });
 }
 
+/** Cell keys ("r,c") to Check; anything malformed is dropped. Omitted means the whole grid. */
+function sanitizeCells(cells: unknown, size: number): string[] | undefined {
+  if (cells === undefined) return undefined;
+  if (!Array.isArray(cells)) throw new GameError("Invalid cells", 400);
+  return cells.filter((cell): cell is string => {
+    const match = typeof cell === "string" && /^(\d),(\d)$/.exec(cell);
+    return !!match && Number(match[1]) < size && Number(match[2]) < size;
+  });
+}
+
 function toView(puzzle: Puzzle, game: GameRecord): GameView {
   return {
     grid: game.grid,
@@ -86,7 +96,7 @@ export async function applyGameAction(
   session: Session,
   puzzleId: string,
   action: GameAction,
-  body: { grid?: unknown; elapsedSeconds?: unknown }
+  body: { grid?: unknown; elapsedSeconds?: unknown; cells?: unknown }
 ): Promise<{ game: GameView | null; wrongCells?: string[] }> {
   const puzzle = resolvePuzzle(puzzleId);
   const store = getStore();
@@ -115,7 +125,7 @@ async function updateGame(
   puzzleId: string,
   puzzle: Puzzle,
   action: Exclude<GameAction, "sync">,
-  body: { grid?: unknown; elapsedSeconds?: unknown }
+  body: { grid?: unknown; elapsedSeconds?: unknown; cells?: unknown }
 ): Promise<{ game: GameView; wrongCells?: string[] }> {
   const store = getStore();
   const now = Date.now();
@@ -146,7 +156,7 @@ async function updateGame(
   } else {
     const grid = sanitizeGrid(body.grid, puzzle.size);
     if (action === "check") {
-      const result = scoreAfterCheck(puzzle, game.score, grid);
+      const result = scoreAfterCheck(puzzle, game.score, grid, sanitizeCells(body.cells, puzzle.size));
       game.score = result.record;
       wrongCells = result.wrongCells;
     } else if (!finished) {

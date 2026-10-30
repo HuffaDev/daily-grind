@@ -6,6 +6,8 @@ export interface DailyProgress {
   elapsedSeconds: number;
   complete: boolean;
   score: ScoreRecord;
+  /** Cells a Check confirmed correct; they can no longer be edited. */
+  lockedCells: string[];
 }
 
 const STORAGE_KEY = "mini-crossword-daily-progress";
@@ -15,7 +17,7 @@ function emptyGrid(size: number): string[][] {
 }
 
 export function emptyProgress(puzzleId: string, size: number): DailyProgress {
-  return { puzzleId, userGrid: emptyGrid(size), elapsedSeconds: 0, complete: false, score: emptyScore() };
+  return { puzzleId, userGrid: emptyGrid(size), elapsedSeconds: 0, complete: false, score: emptyScore(), lockedCells: [] };
 }
 
 /** Returns saved progress for `puzzleId`, or a fresh empty progress if none is saved for that puzzle. */
@@ -34,6 +36,7 @@ export function loadDailyProgress(puzzleId: string, size: number): DailyProgress
       elapsedSeconds: parsed.elapsedSeconds ?? 0,
       complete: parsed.complete ?? false,
       score: parsed.score ?? { ...emptyScore(), revealed: parsed.revealed ?? false },
+      lockedCells: parsed.lockedCells ?? [],
     };
   } catch {
     return emptyProgress(puzzleId, size);

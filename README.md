@@ -11,7 +11,7 @@ Rules live in `src/lib/scoring.ts`. The browser uses them for instant feedback a
 | Each correct word | 10 × length + rare-letter bonus (D G 1 · B C M P 2 · F H V W Y 3 · K 4 · J X 6 · Q Z 8) |
 | Completing without Reveal | +100 |
 | Time bonus (on completion) | 200 × (1 − time / 10 min), minimum 0 |
-| Check | −5 per wrong cell it flags |
+| Check letter / Check word | −5 per wrong letter it flags; correct letters turn green and lock |
 | Reveal | Keeps words already earned; no completion or time bonus |
 
 The server re-scores every submission. A solve's time is the slower of the time the client reports and the play time the server measures from request heartbeats, so editing the client's clock doesn't help.
@@ -39,8 +39,7 @@ In a normal browser the game runs fully locally. With no Redis configured, the A
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
 2. **OAuth2**: copy the client ID and secret, and add any redirect URL (e.g. `https://127.0.0.1`). The portal requires one, but Activities don't use it.
 3. **Activities → URL Mappings**:
-   - `/` → your deployment's host (e.g. `mini-crossword.vercel.app`)
-   - `/discord-cdn` → `cdn.discordapp.com` (needed for leaderboard avatars)
+   - `/` → your deployment's host (e.g. `mini-crossword.vercel.app`). That's the only mapping needed; avatars are served through `/api/avatar`.
 4. **Activities → Settings**: enable Activities.
 5. Deploy to Vercel. Add the Upstash Redis integration and set the variables from `.env.example`.
 

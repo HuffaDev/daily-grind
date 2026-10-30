@@ -14,6 +14,8 @@ interface Props {
   selected: { row: number; col: number };
   highlighted: Set<string>;
   wrongCells: Set<string>;
+  /** Letters a Check confirmed correct, shown in green. */
+  lockedCells: Set<string>;
   locked?: boolean;
   onSelect: (r: number, c: number) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => void;
@@ -38,7 +40,7 @@ function typedLetter(value: string, previous: string): string | null {
 }
 
 const CrosswordGrid = forwardRef<CrosswordGridHandle, Props>(function CrosswordGrid(
-  { puzzle, userGrid, selected, highlighted, wrongCells, locked = false, onSelect, onKeyDown, onInputLetter, onInputClear },
+  { puzzle, userGrid, selected, highlighted, wrongCells, lockedCells, locked = false, onSelect, onKeyDown, onInputLetter, onInputClear },
   ref
 ) {
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -68,6 +70,7 @@ const CrosswordGrid = forwardRef<CrosswordGridHandle, Props>(function CrosswordG
         const isSelected = selected.row === cell.row && selected.col === cell.col;
         const isHighlighted = highlighted.has(k);
         const isWrong = wrongCells.has(k);
+        const isConfirmed = lockedCells.has(k);
 
         return (
           <div
@@ -105,7 +108,7 @@ const CrosswordGrid = forwardRef<CrosswordGridHandle, Props>(function CrosswordG
                 else onInputClear(cell.row, cell.col);
               }}
               className={`w-full h-full bg-transparent text-center font-semibold text-lg sm:text-2xl uppercase caret-transparent focus:outline-none ${
-                isWrong ? "text-red-600" : "text-neutral-900"
+                isWrong ? "text-red-600" : isConfirmed ? "text-green-700" : "text-neutral-900"
               }`}
             />
           </div>
