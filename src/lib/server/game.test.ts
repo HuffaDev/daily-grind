@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { getUtcDateKey } from "@/lib/daily";
 import { getPuzzleId } from "@/lib/generator";
 import { emptyGrid, gridWithSlot, puzzleFor, solutionGrid, wrongLetterAt } from "@/lib/testUtils";
-import { applyGameAction, getLeaderboard } from "./game";
+import { applyGameAction, getAllTimeLeaderboard, getLeaderboard } from "./game";
 import { createSession, verifySession } from "./session";
 
 // Runs against the in-memory store (no Redis configured in tests). Each test
@@ -88,5 +88,79 @@ describe("applyGameAction", () => {
     expect(await onB()).toHaveLength(0);
     await applyGameAction(elsewhere, puzzleId, "sync", {});
     expect(await onB()).toHaveLength(1);
+  });
+
+  it("lists a server's players on its all-time board", async () => {
+    const player = newPlayer("guild:all-time");
+    await applyGameAction(player, puzzleId, "progress", { grid: solutionGrid(puzzle), elapsedSeconds: 12 });
+    const board = await getAllTimeLeaderboard(player);
+    expect(board).toHaveLength(1);
+    expect(board[0]).toMatchObject({ userId: player.userId, played: 1, solved: 1, bestTimeSeconds: 12 });
+    expect(await getAllTimeLeaderboard(newPlayer("guild:elsewhere"))).toEqual([]);
+  });
+});
+
+describe("results webhook", () => {
+  const realFetch = globalThis.fetch;
+  let reports: { body: unknown; authorization: string | null }[] = [];
+
+  beforeEach(() => {
+    reports = [];
+    process.env.RESULTS_WEBHOOK_URL = "https://webhook.test/results";
+    process.env.RESULTS_WEBHOOK_TOKEN = "token";
+    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+      reports.push({
+        body: JSON.parse(String(init?.body)),
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      return new Response(null, { status: 201 });
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    delete process.env.RESULTS_WEBHOOK_URL;
+    delete process.env.RESULTS_WEBHOOK_TOKEN;
+  });
+
+  it("reports a solve once", async () => {
+    const player = newPlayer();
+    await applyGameAction(player, puzzleId, "progress", { grid: emptyGrid(puzzle), elapsedSeconds: 20 });
+    const { game } = await applyGameAction(player, puzzleId, "progress", {
+      grid: solutionGrid(puzzle),
+      elapsedSeconds: 42,
+    });
+    await applyGameAction(player, puzzleId, "progress", { grid: solutionGrid(puzzle), elapsedSeconds: 50 });
+    expect(reports).toEqual([
+      {
+        body: { user_id: player.userId, date: dateKey, solve_time_secs: 42, points: game!.points },
+        authorization: "Bearer token",
+      },
+    ]);
+  });
+
+  it("sends no Authorization header without a token", async () => {
+    delete process.env.RESULTS_WEBHOOK_TOKEN;
+    await applyGameAction(newPlayer(), puzzleId, "progress", { grid: solutionGrid(puzzle), elapsedSeconds: 9 });
+    expect(reports.map((r) => r.authorization)).toEqual([null]);
+  });
+
+  it("never reports a revealed puzzle", async () => {
+    const player = newPlayer();
+    await applyGameAction(player, puzzleId, "progress", { grid: emptyGrid(puzzle), elapsedSeconds: 5 });
+    await applyGameAction(player, puzzleId, "reveal", {});
+    expect(reports).toEqual([]);
+  });
+
+  it("still saves the game when the webhook is down", async () => {
+    globalThis.fetch = mock(async () => {
+      throw new Error("connection refused");
+    }) as unknown as typeof fetch;
+    const player = newPlayer();
+    const { game } = await applyGameAction(player, puzzleId, "progress", {
+      grid: solutionGrid(puzzle),
+      elapsedSeconds: 7,
+    });
+    expect(game!.score.solvedTimeSeconds).toBe(7);
   });
 });

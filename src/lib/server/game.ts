@@ -2,6 +2,8 @@ import { generateDailyPuzzle, parsePuzzleId, PUZZLE_VERSION } from "@/lib/genera
 import { getUtcDateKey } from "@/lib/daily";
 import { Puzzle } from "@/lib/types";
 import { emptyScore, scoreAfterCheck, scoreAfterGrid, scoreAfterReveal, scoreBreakdown, ScoreRecord } from "@/lib/scoring";
+import { AllTimeEntry, allTimeStandings, compareEntries } from "./allTime";
+import { reportSolve } from "./webhook";
 import { Session } from "./session";
 import { BoardEntry, GameRecord, getStore, LockTimeoutError } from "./store";
 
@@ -109,24 +111,40 @@ export async function applyGameAction(
     return { game: toView(puzzle, game) };
   }
 
+  let result: Awaited<ReturnType<typeof updateGame>>;
   try {
-    return await store.withGameLock(puzzleId, session.userId, () =>
+    result = await store.withGameLock(puzzleId, session.userId, () =>
       updateGame(session, puzzleId, puzzle, action, body)
     );
   } catch (err) {
     if (err instanceof LockTimeoutError) throw new GameError("Server busy, try again", 503);
     throw err;
   }
+
+  // Reported outside the lock so a slow webhook doesn't hold up the player's next update.
+  const { newlySolved, ...response } = result;
+  if (newlySolved) {
+    await reportSolve({
+      userId: session.userId,
+      dateKey: parsePuzzleId(puzzleId)!.dateKey,
+      solveTimeSeconds: response.game.score.solvedTimeSeconds!,
+      points: response.game.points,
+    });
+  }
+  return response;
 }
 
-/** The read-modify-write half of applyGameAction; callers must hold the player's game lock. */
+/**
+ * The read-modify-write half of applyGameAction; callers must hold the player's game lock.
+ * `newlySolved` is true only for the update that first completes the puzzle without a reveal.
+ */
 async function updateGame(
   session: Session,
   puzzleId: string,
   puzzle: Puzzle,
   action: Exclude<GameAction, "sync">,
   body: { grid?: unknown; elapsedSeconds?: unknown; cells?: unknown }
-): Promise<{ game: GameView; wrongCells?: string[] }> {
+): Promise<{ game: GameView; wrongCells?: string[]; newlySolved: boolean }> {
   const store = getStore();
   const now = Date.now();
   let game = await store.getGame(puzzleId, session.userId);
@@ -169,16 +187,16 @@ async function updateGame(
 
   await store.saveGame(puzzleId, session.userId, game);
   await store.upsertEntry(puzzleId, session.scope, toEntry(puzzle, session, game));
-  return { game: toView(puzzle, game), wrongCells };
+  const newlySolved = !finished && game.score.solvedTimeSeconds !== null && !game.score.revealed;
+  return { game: toView(puzzle, game), wrongCells, newlySolved };
 }
 
 export async function getLeaderboard(session: Session, puzzleId: string): Promise<BoardEntry[]> {
   resolvePuzzle(puzzleId);
   const entries = await getStore().getBoard(puzzleId, session.scope);
-  return entries.sort(
-    (a, b) =>
-      b.points - a.points ||
-      (a.solvedTimeSeconds ?? Infinity) - (b.solvedTimeSeconds ?? Infinity) ||
-      a.updatedAt - b.updatedAt
-  );
+  return entries.sort(compareEntries);
+}
+
+export async function getAllTimeLeaderboard(session: Session): Promise<AllTimeEntry[]> {
+  return allTimeStandings(await getStore().getAllBoards(session.scope), getUtcDateKey());
 }

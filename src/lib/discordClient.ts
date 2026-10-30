@@ -1,8 +1,9 @@
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
 import type { GameAction, GameView } from "./server/game";
+import type { AllTimeEntry } from "./server/allTime";
 import type { BoardEntry } from "./server/store";
 
-export type { BoardEntry, GameView };
+export type { AllTimeEntry, BoardEntry, GameView };
 
 export interface DiscordUserInfo {
   id: string;
@@ -113,6 +114,11 @@ export async function fetchLeaderboard(conn: DiscordConnection, puzzleId: string
     conn,
     `/api/leaderboard?puzzleId=${encodeURIComponent(puzzleId)}`
   );
+  return data.entries;
+}
+
+export async function fetchAllTimeLeaderboard(conn: DiscordConnection): Promise<AllTimeEntry[]> {
+  const data = await request<{ entries: AllTimeEntry[] }>(conn, "/api/leaderboard/all-time");
   return data.entries;
 }
 
