@@ -2,7 +2,7 @@
 // word, in place, without touching anything else in the file (comments,
 // imports, surrounding structure). Entries are assumed to be one per line,
 // e.g.:  { word: "AT", clue: "..." },
-const fs = require("fs");
+import fs from "node:fs";
 
 function sortArrayBlocks(filePath, arrayNames) {
   const lines = fs.readFileSync(filePath, "utf8").split("\n");

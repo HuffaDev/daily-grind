@@ -1,10 +1,14 @@
 export interface Stats {
+  /** Days with a finished game — solved or revealed. */
   gamesPlayed: number;
+  /** Days solved without Reveal. */
   gamesWon: number;
   bestTimeSeconds: number | null;
   currentStreak: number;
   bestStreak: number;
   lastWonDate: string | null;
+  /** Puzzle date of the last finished game, so one day is never counted twice. */
+  lastPlayedDate: string | null;
 }
 
 const STORAGE_KEY = "mini-crossword-stats";
@@ -16,49 +20,63 @@ export const DEFAULT_STATS: Stats = {
   currentStreak: 0,
   bestStreak: 0,
   lastWonDate: null,
+  lastPlayedDate: null,
 };
 
-export function loadStats(): Stats {
+/** The UTC date key ("YYYY-MM-DD") of the day before `dateKey`. */
+export function previousDateKey(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * Loads stats as of puzzle date `dateKey`. A streak whose last win is older
+ * than the day before `dateKey` has already been broken, so it reads as 0
+ * instead of lingering until the next win.
+ */
+export function loadStats(dateKey: string): Stats {
   if (typeof window === "undefined") return DEFAULT_STATS;
+  let stats: Stats;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_STATS;
-    return { ...DEFAULT_STATS, ...JSON.parse(raw) };
+    stats = { ...DEFAULT_STATS, ...JSON.parse(raw) };
   } catch {
     return DEFAULT_STATS;
   }
+  const alive = stats.lastWonDate === dateKey || stats.lastWonDate === previousDateKey(dateKey);
+  return alive ? stats : { ...stats, currentStreak: 0 };
 }
 
 function saveStats(stats: Stats): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
-}
-
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isYesterday(dateKey: string): boolean {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return dateKey === yesterday.toISOString().slice(0, 10);
-}
-
-export function recordWin(timeSeconds: number): Stats {
-  const stats = loadStats();
-  const today = todayKey();
-
-  stats.gamesPlayed += 1;
-  stats.gamesWon += 1;
-  stats.bestTimeSeconds =
-    stats.bestTimeSeconds === null ? timeSeconds : Math.min(stats.bestTimeSeconds, timeSeconds);
-
-  if (stats.lastWonDate !== today) {
-    stats.currentStreak = stats.lastWonDate && isYesterday(stats.lastWonDate) ? stats.currentStreak + 1 : 1;
-    stats.lastWonDate = today;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+  } catch {
+    // Storage can be unavailable (private mode, blocked in some embeds).
   }
-  stats.bestStreak = Math.max(stats.bestStreak, stats.currentStreak);
+}
 
+/** Pure core of recordGame: applies one finished game for puzzle date `dateKey`. */
+export function applyGame(stats: Stats, dateKey: string, result: { won: boolean; timeSeconds: number }): Stats {
+  if (stats.lastPlayedDate === dateKey) return stats;
+  const next = { ...stats, gamesPlayed: stats.gamesPlayed + 1, lastPlayedDate: dateKey };
+  if (result.won) {
+    next.gamesWon += 1;
+    next.bestTimeSeconds =
+      next.bestTimeSeconds === null ? result.timeSeconds : Math.min(next.bestTimeSeconds, result.timeSeconds);
+    next.currentStreak = next.lastWonDate === previousDateKey(dateKey) ? next.currentStreak + 1 : 1;
+    next.lastWonDate = dateKey;
+    next.bestStreak = Math.max(next.bestStreak, next.currentStreak);
+  } else {
+    next.currentStreak = 0;
+  }
+  return next;
+}
+
+/** Records a finished game (solved, or revealed when `won` is false) for puzzle date `dateKey`. */
+export function recordGame(dateKey: string, result: { won: boolean; timeSeconds: number }): Stats {
+  const stats = applyGame(loadStats(dateKey), dateKey, result);
   saveStats(stats);
   return stats;
 }

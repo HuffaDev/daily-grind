@@ -4,14 +4,20 @@ import { useState } from "react";
 
 interface Props {
   text: string;
+  /** Replaces copying to the clipboard, e.g. with Discord's share dialog (the clipboard is blocked in Activities). */
+  onShare?: (text: string) => Promise<void>;
   className?: string;
 }
 
-export default function ShareButton({ text, className }: Props) {
+export default function ShareButton({ text, onShare, className }: Props) {
   const [copied, setCopied] = useState(false);
 
   const handleClick = async () => {
     try {
+      if (onShare) {
+        await onShare(text);
+        return;
+      }
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

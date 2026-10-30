@@ -1,54 +1,92 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { generateDailyPuzzle } from "@/lib/generator";
+import { generateDailyPuzzle, getPuzzleId } from "@/lib/generator";
 import { getDailyPuzzleNumber, getUtcDateKey } from "@/lib/daily";
 import { Direction, Slot } from "@/lib/types";
 import { buildSlotMaps, formatTime, isComplete, key, slotAt } from "@/lib/puzzleUtils";
-import { DEFAULT_STATS, loadStats, recordWin, Stats } from "@/lib/stats";
+import { DEFAULT_STATS, loadStats, recordGame, Stats } from "@/lib/stats";
 import { emptyProgress, loadDailyProgress, saveDailyProgress } from "@/lib/dailyProgress";
 import { buildShareText } from "@/lib/share";
+import { emptyScore, scoreAfterCheck, scoreAfterGrid, scoreAfterReveal, scoreBreakdown, ScoreRecord } from "@/lib/scoring";
+import { connectDiscord, DiscordConnection, GameApiError, isInDiscord, postGameAction } from "@/lib/discordClient";
+import { mergeScore, reconcileWithServer } from "@/lib/reconcile";
+import { useUtcDateKey } from "@/lib/useUtcDateKey";
 import CrosswordGrid, { CrosswordGridHandle } from "./CrosswordGrid";
 import ClueList from "./ClueList";
 import WinModal from "./WinModal";
 import ThemeToggle from "./ThemeToggle";
 import NextPuzzleCountdown from "./NextPuzzleCountdown";
 import ShareButton from "./ShareButton";
+import Leaderboard from "./Leaderboard";
+
+/** How long typing must pause before progress is sent to the leaderboard server. */
+const PROGRESS_DEBOUNCE_MS = 600;
+/** Keeps the server's play-time measurement alive while the timer runs (see ACTIVE_GAP_CAP_MS). */
+const HEARTBEAT_MS = 15_000;
 
 export default function Crossword() {
-  // The date key (and therefore the puzzle) is deterministic and identical
-  // for every player — it only needs to be computed once per mount.
-  const [dateKey] = useState(() => getUtcDateKey());
+  // The date key picks the puzzle, which is identical for every player that
+  // day. Keying on it gives each day's puzzle a completely fresh game state.
+  const [dateKey, setDateKey] = useState(() => getUtcDateKey());
+  return <DailyCrossword key={dateKey} dateKey={dateKey} onPlayDate={setDateKey} />;
+}
+
+interface DailyCrosswordProps {
+  dateKey: string;
+  onPlayDate: (dateKey: string) => void;
+}
+
+function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
+  // Stays on this puzzle past 00:00 UTC so an in-progress game can be
+  // finished (the server still accepts yesterday's); the player moves on.
+  const today = useUtcDateKey();
+  const newPuzzleOut = today !== dateKey;
   const puzzle = useMemo(() => generateDailyPuzzle(dateKey), [dateKey]);
+  const puzzleId = useMemo(() => getPuzzleId(dateKey), [dateKey]);
   const puzzleNumber = useMemo(() => getDailyPuzzleNumber(dateKey), [dateKey]);
   const maps = useMemo(() => buildSlotMaps(puzzle), [puzzle]);
 
   const [progressLoaded, setProgressLoaded] = useState(false);
-  const [userGrid, setUserGrid] = useState<string[][]>(() => emptyProgress(dateKey, puzzle.size).userGrid);
+  const [userGrid, setUserGrid] = useState<string[][]>(() => emptyProgress(puzzleId, puzzle.size).userGrid);
   const [selected, setSelected] = useState({ row: 0, col: 0 });
   const [direction, setDirection] = useState<Direction>("across");
   const [wrongCells, setWrongCells] = useState<Set<string>>(new Set());
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [complete, setComplete] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [score, setScore] = useState<ScoreRecord>(emptyScore);
+  const revealed = score.revealed;
   const [showWin, setShowWin] = useState(false);
   // Starts at the same default on server and client; the real saved value
   // (from localStorage) is only readable client-side, so it's loaded below.
   const [stats, setStats] = useState<Stats>(DEFAULT_STATS);
 
+  const [connection, setConnection] = useState<DiscordConnection | null>(null);
+  const [serverSynced, setServerSynced] = useState(false);
+  const [serverNotice, setServerNotice] = useState<string | null>(null);
+
   const gridRef = useRef<CrosswordGridHandle>(null);
+  // Set by player edits, so loading or syncing a grid never counts as playing.
+  const editedRef = useRef(false);
+  const latestRef = useRef({ userGrid, elapsed, score });
+  useEffect(() => {
+    latestRef.current = { userGrid, elapsed, score };
+  });
+  // Game requests run one at a time, in order. Sent concurrently, a reveal and
+  // a progress update could reach the server in either order.
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Load today's saved progress and stats once, on mount — localStorage
   // isn't available during server rendering, so this has to happen client-side.
   useEffect(() => {
-    const progress = loadDailyProgress(dateKey, puzzle.size);
+    const progress = loadDailyProgress(puzzleId, puzzle.size);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUserGrid(progress.userGrid);
     setElapsed(progress.elapsedSeconds);
     setComplete(progress.complete);
-    setRevealed(progress.revealed);
-    setStats(loadStats());
+    setScore(progress.score);
+    setStats(loadStats(dateKey));
     setProgressLoaded(true);
     const first = firstWhiteCell();
     setSelected(first);
@@ -61,14 +99,105 @@ export default function Crossword() {
       }
       return { row: 0, col: 0 };
     }
-  }, [dateKey, puzzle]);
+  }, [puzzleId, puzzle, dateKey]);
 
   // Persist progress on every change, once the initial load has happened
   // (otherwise we'd immediately overwrite saved progress with the defaults).
   useEffect(() => {
     if (!progressLoaded) return;
-    saveDailyProgress({ dateKey, userGrid, elapsedSeconds: elapsed, complete, revealed });
-  }, [progressLoaded, dateKey, userGrid, elapsed, complete, revealed]);
+    saveDailyProgress({ puzzleId, userGrid, elapsedSeconds: elapsed, complete, score });
+  }, [progressLoaded, puzzleId, userGrid, elapsed, complete, score]);
+
+  // Inside Discord, sign in so progress counts toward the server's leaderboard.
+  // In a plain browser the game stays fully local.
+  useEffect(() => {
+    if (!isInDiscord()) return;
+    connectDiscord().then(setConnection, (err: Error) => setServerNotice(`Leaderboard unavailable: ${err.message}`));
+  }, []);
+
+  const handleServerError = useCallback((err: unknown) => {
+    if (err instanceof GameApiError && err.status === 409) setServerNotice(err.message);
+    else console.warn("Leaderboard sync failed", err);
+  }, []);
+
+  // Once signed in, keep whichever copy of today's game is further along —
+  // the server's (played on another device) or this device's (uploads failed)
+  // — and upload this device's copy if the server is behind.
+  useEffect(() => {
+    if (!connection || !progressLoaded || serverSynced) return;
+    let cancelled = false;
+    const { userGrid: localGrid, elapsed: localElapsed, score: localScore } = latestRef.current;
+    postGameAction(connection, { puzzleId, action: "sync" })
+      .then(async ({ game }) => {
+        if (cancelled) return;
+        const merged = reconcileWithServer(
+          puzzle,
+          { grid: localGrid, score: localScore, elapsedSeconds: localElapsed },
+          game
+        );
+        setUserGrid(merged.grid);
+        setElapsed(merged.elapsedSeconds);
+        setScore(merged.score);
+        setComplete(isComplete(puzzle, merged.grid));
+        if (merged.upload === "none") return;
+        const res = await postGameAction(connection, {
+          puzzleId,
+          action: merged.upload,
+          grid: merged.grid,
+          elapsedSeconds: merged.elapsedSeconds,
+        });
+        const serverScore = res.game?.score;
+        if (serverScore && !cancelled) setScore((prev) => mergeScore(prev, serverScore));
+      })
+      .catch(handleServerError)
+      .finally(() => {
+        if (!cancelled) setServerSynced(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, progressLoaded, serverSynced, puzzleId, puzzle, handleServerError]);
+
+  const sendAction = useCallback(
+    (action: "progress" | "check" | "reveal", grid?: string[][]) => {
+      if (!connection || !serverSynced) return;
+      queueRef.current = queueRef.current.then(async () => {
+        try {
+          const res = await postGameAction(connection, {
+            puzzleId,
+            action,
+            // Read when the request actually goes out, so queued progress sends the newest grid.
+            grid: grid ?? latestRef.current.userGrid,
+            elapsedSeconds: latestRef.current.elapsed,
+          });
+          const serverScore = res.game?.score;
+          if (serverScore) setScore((prev) => mergeScore(prev, serverScore));
+        } catch (err) {
+          handleServerError(err);
+        }
+      });
+    },
+    [connection, serverSynced, puzzleId, handleServerError]
+  );
+
+  // Debounced while typing; sent right away on the edit that completes the grid.
+  // Never after a reveal: the revealed grid is fully correct and would score as a solve.
+  useEffect(() => {
+    if (!editedRef.current || revealed) return;
+    const id = setTimeout(() => sendAction("progress"), complete ? 0 : PROGRESS_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [userGrid, complete, revealed, sendAction]);
+
+  useEffect(() => {
+    if (!running || complete || revealed) return;
+    const id = setInterval(() => sendAction("progress"), HEARTBEAT_MS);
+    return () => clearInterval(id);
+  }, [running, complete, revealed, sendAction]);
+
+  const breakdown = useMemo(() => scoreBreakdown(puzzle, score), [puzzle, score]);
+  // The solve time the leaderboard uses (the server's, once it has replied),
+  // so the banner, win screen, share text and board all agree.
+  const finishTime = score.solvedTimeSeconds ?? elapsed;
 
   const activeSlot = useMemo(
     () => slotAt(maps, selected.row, selected.col, direction) ?? null,
@@ -94,11 +223,23 @@ export default function Crossword() {
       buildShareText({
         puzzle,
         puzzleNumber,
-        timeSeconds: elapsed,
+        timeSeconds: finishTime,
         revealed,
-        url: typeof window !== "undefined" ? window.location.href : undefined,
+        points: breakdown.total,
+        // Discord's share dialog attaches the Activity link itself.
+        url: typeof window !== "undefined" && !isInDiscord() ? window.location.href : undefined,
       }),
-    [puzzle, puzzleNumber, elapsed, revealed]
+    [puzzle, puzzleNumber, finishTime, revealed, breakdown.total]
+  );
+
+  const handleShare = useMemo(
+    () =>
+      connection
+        ? async (text: string) => {
+            await connection.sdk.commands.shareLink({ message: text });
+          }
+        : undefined,
+    [connection]
   );
 
   // Timer ticks once per second while the game is running and unsolved.
@@ -108,19 +249,18 @@ export default function Crossword() {
     return () => clearInterval(id);
   }, [running, complete]);
 
-  // Detect completion whenever the grid changes. This transition (typing the
-  // final correct letter) only happens once per game, so the resulting
-  // setState calls here don't cascade on every render.
+  // Bank points for newly correct words, then detect completion. The
+  // completion transition (typing the final correct letter) only happens once
+  // per game, so the resulting setState calls don't cascade on every render.
   useEffect(() => {
     if (complete || userGrid.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setScore((prev) => scoreAfterGrid(puzzle, prev, userGrid, elapsed));
     if (isComplete(puzzle, userGrid)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setComplete(true);
       setRunning(false);
       setShowWin(true);
-      if (!revealed) {
-        setStats(recordWin(elapsed));
-      }
+      setStats(recordGame(dateKey, { won: !revealed, timeSeconds: elapsed }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userGrid, puzzle]);
@@ -175,6 +315,7 @@ export default function Crossword() {
   const handleType = useCallback(
     (r: number, c: number, letter: string) => {
       if (complete) return;
+      editedRef.current = true;
       setRunning(true);
       setUserGrid((prev) => {
         const next = prev.map((row) => [...row]);
@@ -190,6 +331,7 @@ export default function Crossword() {
   const handleBackspace = useCallback(
     (r: number, c: number) => {
       if (complete) return;
+      editedRef.current = true;
       if (userGrid[r]?.[c]) {
         setUserGrid((prev) => {
           const next = prev.map((row) => [...row]);
@@ -268,6 +410,7 @@ export default function Crossword() {
         handleBackspace(r, c);
       } else if (k === "Delete") {
         e.preventDefault();
+        editedRef.current = true;
         setUserGrid((prev) => {
           const next = prev.map((row) => [...row]);
           next[r][c] = "";
@@ -295,41 +438,45 @@ export default function Crossword() {
   }, []);
 
   const handleCheck = useCallback(() => {
-    const wrong = new Set<string>();
-    for (const row of puzzle.cells) {
-      for (const cell of row) {
-        if (cell.black) continue;
-        const val = userGrid[cell.row]?.[cell.col];
-        if (val && val !== cell.solution) wrong.add(key(cell.row, cell.col));
-      }
-    }
-    setWrongCells(wrong);
-  }, [puzzle, userGrid]);
+    const result = scoreAfterCheck(puzzle, score, userGrid);
+    setWrongCells(new Set(result.wrongCells));
+    setScore(result.record);
+    sendAction("check", userGrid);
+  }, [puzzle, score, userGrid, sendAction]);
 
   const handleReveal = useCallback(() => {
     const solved = puzzle.cells.map((row) => row.map((cell) => (cell.black ? "" : cell.solution)));
-    setRevealed(true);
+    setScore(scoreAfterReveal);
     setUserGrid(solved);
     setWrongCells(new Set());
-  }, [puzzle]);
+    sendAction("reveal");
+  }, [puzzle, sendAction]);
 
   const buttonClass =
-    "px-3 py-1.5 rounded-md text-sm font-medium bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors";
+    "short:hidden px-3 py-1.5 rounded-md text-sm font-medium bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors";
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <header className="flex flex-wrap items-start justify-between gap-3 mb-4">
+    <div className="max-w-3xl mx-auto p-4 short:p-2">
+      <header className="flex flex-wrap items-start justify-between gap-3 mb-4 short:mb-2">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Mini Crossword</h1>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <h1 className="text-2xl short:text-base font-bold text-neutral-900 dark:text-neutral-50">Mini Crossword</h1>
+          <p className="short:hidden text-xs text-neutral-500 dark:text-neutral-400">
             Daily puzzle #{puzzleNumber} · same for everyone today
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <span
+            className="font-semibold tabular-nums text-neutral-900 dark:text-neutral-50"
+            title="Words solved + completion and time bonuses − check penalties"
+          >
+            {breakdown.total} pts
+          </span>
           {complete ? (
-            <span className="text-neutral-600 dark:text-neutral-400">
-              Next puzzle in <NextPuzzleCountdown />
-            </span>
+            !newPuzzleOut && (
+              <span className="text-neutral-600 dark:text-neutral-400">
+                Next puzzle in <NextPuzzleCountdown />
+              </span>
+            )
           ) : (
             <>
               <span className="font-mono tabular-nums text-neutral-700 dark:text-neutral-300 w-12 text-center">
@@ -343,23 +490,57 @@ export default function Crossword() {
               </button>
             </>
           )}
-          <ThemeToggle />
+          <span className="short:hidden">
+            <ThemeToggle />
+          </span>
         </div>
       </header>
 
+      {newPuzzleOut && (
+        <div className="mb-4 short:mb-2 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200 px-4 py-2 text-sm">
+          <span>
+            {complete ? "Today's puzzle is out." : "A new puzzle is out. You can still finish this one."}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPlayDate(today)}
+            className="shrink-0 px-3 py-1.5 rounded-md font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+          >
+            Play today&apos;s puzzle
+          </button>
+        </div>
+      )}
+
+      {serverNotice && (
+        <div className="mb-4 rounded-lg bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-200 px-4 py-2 text-sm">
+          {serverNotice}
+        </div>
+      )}
+
       {complete && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-4 py-3 text-sm">
+        <div className="short:hidden mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 px-4 py-3 text-sm">
           <span>
             {revealed
               ? "You revealed today's puzzle."
-              : `You solved today's puzzle in ${formatTime(elapsed)}.`}{" "}
+              : `You solved today's puzzle in ${formatTime(finishTime)}.`}{" "}
             Come back after the countdown for a new one.
           </span>
           <ShareButton
             text={shareText}
+            onShare={handleShare}
             className="shrink-0 px-3 py-1.5 rounded-md text-sm font-medium bg-amber-500 hover:bg-amber-400 text-neutral-900 transition-colors"
           />
         </div>
+      )}
+
+      {activeSlot && !complete && (
+        <p className="mb-3 short:mb-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 px-3 py-2 short:py-1 text-sm text-neutral-800 dark:text-neutral-100">
+          <span className="font-semibold mr-1">
+            {activeSlot.number}
+            {activeSlot.direction === "across" ? "A" : "D"}
+          </span>
+          {activeSlot.clue}
+        </p>
       )}
 
       <div className="flex flex-col md:flex-row gap-6">
@@ -373,15 +554,17 @@ export default function Crossword() {
           locked={complete}
           onSelect={handleCellSelect}
           onKeyDown={handleKeyDown}
+          onInputLetter={handleType}
+          onInputClear={handleBackspace}
         />
 
-        <div className="flex-1 grid grid-cols-2 gap-4">
+        <div className="short:hidden flex-1 grid grid-cols-2 gap-4">
           <ClueList title="Across" slots={acrossSlots} activeSlotId={activeSlot?.id ?? null} onSelect={selectSlot} />
           <ClueList title="Down" slots={downSlots} activeSlotId={activeSlot?.id ?? null} onSelect={selectSlot} />
         </div>
       </div>
 
-      <div className="mt-5 flex gap-5 text-sm text-neutral-500 dark:text-neutral-400">
+      <div className="short:hidden mt-5 flex gap-5 text-sm text-neutral-500 dark:text-neutral-400">
         <span>Best: {stats.bestTimeSeconds !== null ? formatTime(stats.bestTimeSeconds) : "—"}</span>
         <span>Streak: {stats.currentStreak}</span>
         <span>
@@ -389,12 +572,16 @@ export default function Crossword() {
         </span>
       </div>
 
+      {connection && <Leaderboard connection={connection} puzzleId={puzzleId} myPoints={breakdown.total} />}
+
       {showWin && (
         <WinModal
-          timeSeconds={elapsed}
+          timeSeconds={finishTime}
           stats={stats}
           revealed={revealed}
+          breakdown={breakdown}
           shareText={shareText}
+          onShare={handleShare}
           onClose={() => setShowWin(false)}
         />
       )}

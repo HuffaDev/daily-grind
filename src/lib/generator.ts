@@ -3,6 +3,14 @@ import { WORD_BANK, WordEntry } from "./wordbank";
 import { Cell, Puzzle, Slot } from "./types";
 import { getUtcDateKey, mulberry32, seedForDateKey } from "./daily";
 
+/**
+ * Bump whenever the word bank, block patterns, or generator logic change.
+ * The generated puzzle depends on all of them, so a change silently alters
+ * the day's puzzle — the version keeps saved progress and leaderboards from
+ * mixing grids from different builds.
+ */
+export const PUZZLE_VERSION = 1;
+
 const SIZE = 5;
 const MAX_BACKTRACK_STEPS = 150_000;
 
@@ -219,4 +227,15 @@ export function generatePuzzle(rng: Rng = Math.random): Puzzle {
 export function generateDailyPuzzle(dateKey: string = getUtcDateKey()): Puzzle {
   const rng = mulberry32(seedForDateKey(dateKey));
   return generatePuzzle(rng);
+}
+
+/** Identifies one day's puzzle as produced by this build, e.g. "2026-10-30.v1". */
+export function getPuzzleId(dateKey: string): string {
+  return `${dateKey}.v${PUZZLE_VERSION}`;
+}
+
+export function parsePuzzleId(puzzleId: string): { dateKey: string; version: number } | null {
+  const match = /^(\d{4}-\d{2}-\d{2})\.v(\d+)$/.exec(puzzleId);
+  if (!match) return null;
+  return { dateKey: match[1], version: Number(match[2]) };
 }

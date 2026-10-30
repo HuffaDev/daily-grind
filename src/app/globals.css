@@ -4,6 +4,10 @@
    and persisted to localStorage) instead of only the OS preference. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Very short viewports, chiefly Discord's picture-in-picture Activity window:
+   `short:` variants hide everything but the grid, timer and current clue. */
+@custom-variant short (@media (max-height: 480px));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
