@@ -2,7 +2,7 @@ import { getGame } from "@/games/registry";
 import { getUtcDateKey } from "@/platform/daily";
 import { getStore } from "@/platform/server/store";
 import { postDaily } from "./daily";
-import { CommandOption, DiscordApiError, Interaction, InteractionResponse, InteractionType, MessageFlags, ResponseType } from "./discord";
+import { CommandOption, CommandType, DiscordApiError, Interaction, InteractionResponse, InteractionType, MessageFlags, ResponseType } from "./discord";
 import { gameBoardMessage, globalBoardMessage, PLAY_BUTTON_ID } from "./messages";
 
 const launchActivity: InteractionResponse = { type: ResponseType.LAUNCH_ACTIVITY };
@@ -28,6 +28,8 @@ export async function handleInteraction(interaction: Interaction): Promise<Inter
   }
 
   if (interaction.type !== InteractionType.APPLICATION_COMMAND) return privateReply("Sorry, I don't know that one.");
+  // The Activity's own "Launch" command (see scripts/register-commands.ts), from the App Launcher; works anywhere.
+  if (interaction.data?.type === CommandType.ENTRY_POINT) return launchActivity;
 
   const guildId = interaction.guild_id;
   // Commands are registered for servers only, but Discord can still deliver stale ones elsewhere.

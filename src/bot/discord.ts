@@ -5,6 +5,9 @@ export const DISCORD_API = "https://discord.com/api/v10";
 
 export const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3 } as const;
 export const ResponseType = { PONG: 1, CHANNEL_MESSAGE: 4, LAUNCH_ACTIVITY: 12 } as const;
+/** Command types: the Activity's Entry Point ("Launch") command, and who handles it. */
+export const CommandType = { ENTRY_POINT: 4 } as const;
+export const EntryPointHandler = { APP_HANDLER: 1 } as const;
 export const MessageFlags = { EPHEMERAL: 1 << 6 } as const;
 export const OptionType = { SUB_COMMAND: 1, STRING: 3, CHANNEL: 7 } as const;
 export const ChannelType = { GUILD_TEXT: 0, GUILD_ANNOUNCEMENT: 5 } as const;
@@ -23,12 +26,17 @@ export interface CommandOption {
 }
 
 export interface Interaction {
+  /** A snowflake, so it also says when the interaction happened. */
+  id: string;
+  application_id: string;
   type: number;
   guild_id?: string;
   channel_id?: string;
   data?: {
     /** Slash command name. */
     name?: string;
+    /** Command type; ENTRY_POINT for the Activity's "Launch" command. */
+    type?: number;
     options?: CommandOption[];
     /** Button id, for message components. */
     custom_id?: string;

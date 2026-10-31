@@ -4,7 +4,7 @@ import { getPuzzleId, getUtcDateKey, previousDateKey } from "@/platform/daily";
 import { BoardEntry, getStore } from "@/platform/server/store";
 import { GET as cronGet } from "@/app/api/cron/daily/route";
 import { runDailyPosts } from "./daily";
-import { InteractionType, MessageBody, ResponseType, verifyInteraction } from "./discord";
+import { CommandType, InteractionType, MessageBody, ResponseType, verifyInteraction } from "./discord";
 import { handleInteraction } from "./interactions";
 
 // Runs against the in-memory store; each test uses its own guild id, since the store is shared.
@@ -68,14 +68,21 @@ describe("verifyInteraction", () => {
 
 describe("handleInteraction", () => {
   it("answers Discord's endpoint check", async () => {
-    expect(await handleInteraction({ type: InteractionType.PING })).toEqual({ type: ResponseType.PONG });
+    expect(await handleInteraction({ type: InteractionType.PING } as never)).toEqual({ type: ResponseType.PONG });
   });
 
-  it("launches the Activity from /play and the Play button", async () => {
-    expect(await handleInteraction(command("1", "play"))).toEqual({ type: ResponseType.LAUNCH_ACTIVITY });
+  it("launches the Activity from /play, the Play button and the Launch command", async () => {
+    const launch = { type: ResponseType.LAUNCH_ACTIVITY };
+    expect(await handleInteraction(command("1", "play"))).toEqual(launch);
     expect(
-      await handleInteraction({ type: InteractionType.MESSAGE_COMPONENT, guild_id: "1", data: { custom_id: "play" } })
-    ).toEqual({ type: ResponseType.LAUNCH_ACTIVITY });
+      await handleInteraction({
+        type: InteractionType.MESSAGE_COMPONENT,
+        guild_id: "1",
+        data: { custom_id: "play" },
+      } as never)
+    ).toEqual(launch);
+    const entryPoint = { type: InteractionType.APPLICATION_COMMAND, data: { name: "launch", type: CommandType.ENTRY_POINT } };
+    expect(await handleInteraction(entryPoint as never)).toEqual(launch);
   });
 
   it("shows the server's global and per-game boards, escaping names and never pinging", async () => {
