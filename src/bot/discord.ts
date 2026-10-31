@@ -25,13 +25,6 @@ export interface CommandOption {
   options?: CommandOption[];
 }
 
-export interface DiscordUser {
-  id: string;
-  username: string;
-  /** Display name, if the user set one. */
-  global_name?: string | null;
-}
-
 export interface Interaction {
   /** A snowflake, so it also says when the interaction happened. */
   id: string;
@@ -39,9 +32,6 @@ export interface Interaction {
   type: number;
   guild_id?: string;
   channel_id?: string;
-  /** Who sent it, in a server; outside one, `user` instead. */
-  member?: { nick?: string | null; user: DiscordUser };
-  user?: DiscordUser;
   data?: {
     /** Slash command name. */
     name?: string;
@@ -122,6 +112,19 @@ export async function botRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new DiscordApiError(res.status, data?.code, `Discord API ${path} failed: ${res.status} ${data?.message ?? ""}`);
   }
   return data as T;
+}
+
+/** A running Activity: where it is and who's in it. */
+export interface ActivityInstance {
+  location?: { channel_id?: string; guild_id?: string | null };
+  /** User ids of everyone currently in it. */
+  users?: string[];
+}
+
+/** Looks up an Activity instance; Discord answers 404 once it has ended. */
+export function getActivityInstance(instanceId: string): Promise<ActivityInstance> {
+  const appId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
+  return botRequest(`/applications/${appId}/activity-instances/${encodeURIComponent(instanceId)}`);
 }
 
 export function sendMessage(channelId: string, message: MessageBody): Promise<unknown> {

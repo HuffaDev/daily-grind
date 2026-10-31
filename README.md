@@ -85,7 +85,7 @@ Every bot message has a **Play** button that opens the Activity for whoever pres
 
 The bot runs inside the same Next.js app: Discord sends commands to `/api/discord/interactions` as HTTP requests, so there's no always-on process to host. Vercel Cron calls `/api/cron/daily` at 00:00 UTC (`vercel.json`). Each server gets one post a day even if the job runs twice. If a server deletes its channel, its daily posts are turned off; if the bot just lacks permission there, it keeps trying each day.
 
-The bot launches the Activity itself, for `/play`, the Play button and the Activity's Launch command (`register-commands` points Launch at the app), so Discord doesn't post a "Game Invitation" card for every launch. Instead the bot keeps one "Playing Daily Grind" card per channel listing who's joined, editing it on each launch; once an hour passes with no one joining, the next launch starts a new card (`src/bot/playingCard.ts`).
+The bot launches the Activity itself, for `/play`, the Play button and the Activity's Launch command (`register-commands` points Launch at the app), so Discord doesn't post a "Game Invitation" card for every launch. Instead the bot keeps its own card per channel saying who's playing ("Lux and huffa are playing!"). The Activity reports to `/api/presence` when it opens, when someone joins or leaves, every minute, and as it closes; the bot checks with Discord who's actually in it and edits the card, moving people who left to "were playing". Once an hour passes with no one playing, the next player gets a new card and the old one is deleted (`src/bot/playingCard.ts`).
 
 ### Results webhook (optional)
 

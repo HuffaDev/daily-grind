@@ -75,23 +75,33 @@ async function yesterdaysBest(scope: string, game: GameInfo, yesterdayKey: strin
 
 const PLAYERS_SHOWN = 15;
 
-/** The bot's card in a channel listing who's launched Daily Grind lately (see playingCard.ts). */
-export function playingMessage(players: { name: string; launchedAt: number }[]): MessageBody {
-  const lines = players
-    .slice(0, PLAYERS_SHOWN)
-    .map((p) => `🎮 ${escapeMarkdown(p.name)} · <t:${Math.floor(p.launchedAt / 1000)}:R>`);
-  if (players.length > PLAYERS_SHOWN) lines.push(`…and ${players.length - PLAYERS_SHOWN} more`);
-  // A headline like "Lux, huffa and 2 others joined in!", as other Activities do.
-  const [first, second] = players.map((p) => `**${escapeMarkdown(p.name)}**`);
-  const others = players.length - 2;
-  const who =
-    players.length === 1
-      ? first
-      : players.length === 2
-        ? `${first} and ${second}`
-        : `${first}, ${second} and ${others} other${others === 1 ? "" : "s"}`;
+/** "**Lux**", "**Lux** and **huffa**", or "**Lux**, **huffa** and 2 others". */
+function namesList(names: string[]): string {
+  const [first, second] = names.map((name) => `**${escapeMarkdown(name)}**`);
+  if (names.length === 1) return first;
+  if (names.length === 2) return `${first} and ${second}`;
+  const others = names.length - 2;
+  return `${first}, ${second} and ${others} other${others === 1 ? "" : "s"}`;
+}
+
+/**
+ * The bot's card in a channel saying who's playing (see playingCard.ts), with
+ * a headline like other Activities': "Lux and huffa are playing!", or once
+ * everyone has left, "Lux, huffa and 2 others were playing".
+ */
+export function playingMessage(players: { userId: string; name: string; lastSeenAt: number }[], playing: Set<string>): MessageBody {
+  const now = players.filter((p) => playing.has(p.userId));
+  const left = players.filter((p) => !playing.has(p.userId)).sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  const headline = now.length
+    ? `${namesList(now.map((p) => p.name))} ${now.length === 1 ? "is" : "are"} playing!`
+    : `${namesList(left.map((p) => p.name))} ${left.length === 1 ? "was" : "were"} playing`;
+  const lines = [
+    ...now.map((p) => `🟢 ${escapeMarkdown(p.name)}`),
+    ...left.map((p) => `⚪ ${escapeMarkdown(p.name)} · left <t:${Math.floor(p.lastSeenAt / 1000)}:R>`),
+  ];
+  if (lines.length > PLAYERS_SHOWN) lines.splice(PLAYERS_SHOWN, Infinity, `…and ${lines.length - PLAYERS_SHOWN} more`);
   return {
-    content: `${who} joined in!`,
+    content: headline,
     embeds: [{ title: "Daily Grind", description: lines.join("\n"), color: COLOR, footer: { text: "Press Play to join in" } }],
     components: playButton(),
     allowed_mentions: noPings,

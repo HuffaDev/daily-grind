@@ -1,4 +1,5 @@
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
+import { startPresence } from "./presence";
 import type { AllTimeEntry, GlobalEntry } from "./server/standings";
 import type { BoardEntry } from "./server/store";
 
@@ -45,7 +46,9 @@ export function connectDiscord(): Promise<DiscordConnection> {
 
     const data = await signIn(sdk, clientId);
     await sdk.commands.authenticate({ access_token: data.access_token });
-    return { sdk, session: data.session, user: data.user };
+    const connection = { sdk, session: data.session, user: data.user };
+    startPresence(connection);
+    return connection;
   })();
   connecting.catch(() => {
     connecting = null;

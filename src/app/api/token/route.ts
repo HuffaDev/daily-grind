@@ -1,3 +1,4 @@
+import { getActivityInstance } from "@/bot/discord";
 import { createSession } from "@/platform/server/session";
 
 const DISCORD_API = "https://discord.com/api/v10";
@@ -14,26 +15,16 @@ interface GuildMember {
   avatar: string | null;
 }
 
-interface ActivityInstance {
-  location?: { channel_id?: string };
-  users?: string[];
-}
-
 /** Returns true if `userId` is in Activity instance `instanceId` running in `channelId`, else an error message. */
 async function verifyInstanceChannel(
   instanceId: string | null | undefined,
   channelId: string,
   userId: string
 ): Promise<true | string> {
-  const botToken = process.env.DISCORD_BOT_TOKEN;
-  if (!botToken) return "Leaderboards in DMs are not enabled (DISCORD_BOT_TOKEN is not set)";
+  if (!process.env.DISCORD_BOT_TOKEN) return "Leaderboards in DMs are not enabled (DISCORD_BOT_TOKEN is not set)";
   if (!instanceId) return "Missing Activity instance";
-  const res = await fetch(
-    `${DISCORD_API}/applications/${process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID}/activity-instances/${encodeURIComponent(instanceId)}`,
-    { headers: { Authorization: `Bot ${botToken}` } }
-  );
-  if (!res.ok) return "Could not verify this Activity";
-  const instance = (await res.json()) as ActivityInstance;
+  const instance = await getActivityInstance(instanceId).catch(() => null);
+  if (!instance) return "Could not verify this Activity";
   if (instance.location?.channel_id !== channelId || !instance.users?.includes(userId)) {
     return "Not a participant in this Activity";
   }

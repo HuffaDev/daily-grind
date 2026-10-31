@@ -10,8 +10,8 @@ if (!appId) throw new Error("NEXT_PUBLIC_DISCORD_CLIENT_ID is not set");
 // Replacing the command list must keep the Entry Point command Discord made for
 // the Activity, or Discord rejects the whole update. Its handler is switched to
 // the app, so launches reach the bot: it launches the Activity itself (so
-// Discord posts no card per launch) and keeps one "Playing" card per channel
-// up to date instead (src/bot/playingCard.ts).
+// Discord posts no card per launch); the bot keeps its own "playing" card per
+// channel instead (src/bot/playingCard.ts).
 const existing = await botRequest<{ type: number }[]>(`/applications/${appId}/commands`);
 const entryPoints = existing
   .filter((command) => command.type === CommandType.ENTRY_POINT)
