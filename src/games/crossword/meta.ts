@@ -9,7 +9,7 @@ import type { CrosswordBoardDetail } from "./lib/types";
  * the day's puzzle — the version keeps saved progress and leaderboards from
  * mixing grids from different builds.
  */
-export const PUZZLE_VERSION = 1;
+export const PUZZLE_VERSION = 2;
 
 export const crossword: GameInfo = {
   id: "crossword",

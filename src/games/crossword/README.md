@@ -1,6 +1,6 @@
 # Mini Crossword
 
-A daily 5×5 crossword. Everyone gets the same puzzle each UTC day: it is generated deterministically from the date (see `lib/generator.ts`).
+A daily 5×5 crossword. Everyone gets the same puzzle each UTC day: it is generated deterministically from the date (see `lib/generator.ts`). Each day's middle row is a different 5-letter word, taken in turn from a shuffled list, so a grid doesn't come back for about two and a half years. Block patterns (`lib/patterns.ts`) keep 2-letter answers rare.
 
 ![A solved puzzle](docs/screenshots/game.png)
 
@@ -36,4 +36,4 @@ Players can post their result to a channel with **Share Result**. The share grid
 
 Any change to `lib/wordbank*.ts`, `lib/patterns.ts` or `lib/generator.ts` changes the puzzle that a given date produces. When you change any of them, bump `PUZZLE_VERSION` in `meta.ts`. Saved progress and leaderboards are keyed by version, so players get a clean reset instead of a mismatched grid. Ideally deploy such changes near 00:00 UTC.
 
-To refresh the generated part of the word bank from Datamuse, run `bun src/games/crossword/scripts/fetch-clues.ts` from the repo root. `scripts/sort-wordbank.mjs` re-sorts both word lists in place.
+Every clue is written by hand: `lib/wordbank.ts` holds the original lists, and `lib/wordbankCommon.ts` adds common English words (from the shared list in `src/games/shared/words`) so the grid has more to choose from. A word in both keeps `wordbank.ts`'s clue. `scripts/sort-wordbank.mjs` re-sorts both files' lists in place. `lib/variety.test.ts` fills a year of puzzles and fails if a grid repeats or a word turns up too often, so run `bun test` after changing either.
