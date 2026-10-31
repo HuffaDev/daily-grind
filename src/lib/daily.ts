@@ -37,7 +37,7 @@ export function millisUntilNextUtcMidnight(date: Date = new Date()): number {
   return next - date.getTime();
 }
 
-const PUZZLE_EPOCH_UTC = Date.UTC(2026, 0, 1); // arbitrary launch date for numbering
+const PUZZLE_EPOCH_UTC = Date.UTC(2026, 9, 31); // launch day: puzzle #1
 
 export function getDailyPuzzleNumber(dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number);

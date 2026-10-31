@@ -1,6 +1,10 @@
 # Mini Crossword
 
-A daily 5×5 crossword. Everyone gets the same puzzle each UTC day: it is generated deterministically from the date (see `src/lib/generator.ts`). It runs in a normal browser and as a **Discord Activity**, where each server gets a shared daily leaderboard.
+A daily 5×5 crossword. Everyone gets the same puzzle each UTC day: it is generated deterministically from the date (see `src/lib/generator.ts`). It runs in a normal browser and as a **Discord Activity**, where each server gets a shared daily leaderboard and an all-time board.
+
+![A solved puzzle](docs/screenshots/game.png)
+
+![A server's daily leaderboard](docs/screenshots/leaderboard.png) ![A result shared to a Discord channel](docs/screenshots/shared-result.png)
 
 ## Scoring
 
@@ -20,7 +24,21 @@ The server re-scores every submission. A solve's time is the slower of the time 
 
 Inside Discord, each server has one leaderboard per puzzle day. It isn't tied to a voice channel or a single Activity session: anyone who opens the Activity in that server that day, at any time, joins the same board. Players who leave stay on it. Each player solves in their own grid, saved under their Discord user ID; only scores are shared. In a DM or group DM, the board belongs to that channel; this needs `DISCORD_BOT_TOKEN` so the server can confirm with Discord that the player is in that DM. Without it, the game still works in DMs but without a leaderboard.
 
-The day, and the board with it, resets at 00:00 UTC. If the Activity is open at the reset, it offers today's puzzle but lets the player finish the one in progress, which still scores on the previous day's board. Boards are deleted after 3 days.
+The day, and the board with it, resets at 00:00 UTC. If the Activity is open at the reset, it offers today's puzzle but lets the player finish the one in progress, which still scores on the previous day's board.
+
+Daily boards are kept forever. The **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress grid is only kept for 3 days.
+
+Players can post their result to a channel with **Share Result**. The share grid is green for words solved, and yellow for any the player revealed.
+
+### Results webhook (optional)
+
+Set `RESULTS_WEBHOOK_URL` to have the server POST each player's first solve of a puzzle (revealed games don't count), for example to a Discord bot that keeps its own stats:
+
+```json
+{ "user_id": "123…", "date": "2026-10-31", "solve_time_secs": 196, "points": 601 }
+```
+
+If `RESULTS_WEBHOOK_TOKEN` is set, it is sent as `Authorization: Bearer <token>`. Delivery is best effort: if the receiver is down, the solve isn't retried, and the game carries on.
 
 ## Development
 
@@ -41,7 +59,10 @@ In a normal browser the game runs fully locally. With no Redis configured, the A
 3. **Activities → URL Mappings**:
    - `/` → your deployment's host (e.g. `mini-crossword.vercel.app`). That's the only mapping needed; avatars are served through `/api/avatar`.
 4. **Activities → Settings**: enable Activities.
-5. Deploy to Vercel. Add the Upstash Redis integration and set the variables from `.env.example`.
+5. Deploy to Vercel and set the variables from `.env.example`.
+6. Add storage. Without it, scores live in memory: on Vercel each server instance has its own copy, so scores go missing between requests and are lost on every deploy. Set **one** of:
+   - **Upstash Redis**: in the Vercel project, open **Storage → Create Database → Upstash for Redis** and connect it to all environments. It sets `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` names). Redeploy afterwards so the new variables take effect.
+   - **Your own Redis server**: set `REDIS_URL` (e.g. `rediss://:password@host:6379/1`). `REDIS_KEY_PREFIX` is optional. It adds a prefix to every key, so a shared server can limit this app to its own keys with a Redis ACL.
 
 For local testing inside Discord, expose `bun run dev` through a tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) and point the `/` mapping at it. `next.config.ts` already allows `*.discordsays.com` as a dev origin, which the dev server needs to accept requests coming through Discord.
 
