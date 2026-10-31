@@ -42,7 +42,7 @@ describe("applyGameAction", () => {
 
   it("rejects puzzles from other days or generator versions", async () => {
     const player = newPlayer();
-    await expect(applyGameAction(player, "2020-01-01.v1", "sync", {})).rejects.toThrow("no longer active");
+    await expect(applyGameAction(player, getPuzzleId("2020-01-01"), "sync", {})).rejects.toThrow("no longer active");
     await expect(applyGameAction(player, `${dateKey}.v999`, "sync", {})).rejects.toThrow("version mismatch");
   });
 

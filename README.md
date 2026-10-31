@@ -12,6 +12,9 @@ Daily puzzles and games for Discord. Each game has a new puzzle every UTC day, t
 | 🔤 Anagram Chain: grow a 3-letter word into a 7-letter one | [`src/games/anagram-chain`](src/games/anagram-chain/README.md) |
 | 🎚️ Spectrum: place things on a scale, scored against your server's average | [`src/games/spectrum`](src/games/spectrum/README.md) |
 | 💰 Daily Heist: grab the loot and slip past the guards | [`src/games/heist`](src/games/heist/README.md) |
+| 🎬 Vowel Play: name films and TV shows with their vowels missing | [`src/games/vowel-play`](src/games/vowel-play/README.md) |
+| 🧭 Which Way: aim a compass from one city at five others | [`src/games/which-way`](src/games/which-way/README.md) |
+| 🔎 Five Clues: name a person, a country and an animal in as few clues as you can | [`src/games/five-clues`](src/games/five-clues/README.md) |
 
 ## How it's organized
 
@@ -25,15 +28,17 @@ src/
     chess/page.tsx
     sudoku/page.tsx
     picture-logic/page.tsx
-    ladder/, anagram-chain/, spectrum/, heist/
+    ladder/, anagram-chain/, spectrum/, heist/, vowel-play/
+    which-way/page.tsx
+    five-clues/page.tsx
     api/
       token/              Discord sign-in (shared)
       avatar/             Discord avatar proxy (shared)
       leaderboard/        ?game=…&puzzleId=… · all-time?game=… · global
       games/crossword/    each game's own API
       games/chess/        (+ chess/puzzles: the day's puzzles, no sign-in needed)
-      games/sudoku/, games/picture-logic/
-      games/ladder/, games/anagram-chain/, games/heist/   (GET: the day's puzzle, no sign-in needed)
+      games/sudoku/, games/picture-logic/, games/which-way/, games/five-clues/
+      games/ladder/, games/anagram-chain/, games/heist/, games/vowel-play/   (GET: the day's puzzle, no sign-in needed)
       games/spectrum/
       presence/           the Activity reporting who's in it, for the bot's "playing" card
       discord/interactions/  the bot's slash commands and buttons
@@ -54,12 +59,15 @@ src/
                           useGridGame (state, sync, timer, Check/Reveal), GridGameShell (the page)
     stepGame/             shared engine for move-by-move puzzles: rules and scoring,
                           useStepGame (puzzle, moves, sync, timer, Undo/Give up), StepGameShell (the page)
+    roundGame/            shared by games played as a list of final moves: useRoundGame,
+                          no-repeat daily schedule, header, how-to-play and result popups
     server/
       store.ts            Redis / Upstash / in-memory storage, namespaced by game
       session.ts          signed session issued after Discord sign-in
       games.ts            GameError, active-puzzle check, anti-cheat play time
       gridGame.ts         grid games' API: applyGridAction, gridGameRoute
       stepGame.ts         step games' API: applyStepAction, stepGameRoute
+      roundGame.ts        round games' API: applyRoundAction, roundGameRoute
       leaderboard.ts      daily, all-time and global boards
       standings.ts        all-time and global totals
       webhook.ts          optional results webhook
@@ -72,8 +80,11 @@ src/
     ladder/               Ladder (on the step engine)
     anagram-chain/        Anagram Chain (on the step engine)
     heist/                Daily Heist (on the step engine)
+    vowel-play/           Vowel Play (on the step engine)
     spectrum/             Spectrum (scored against everyone in the server)
     shared/words/         the word lists Ladder and Anagram Chain use
+    which-way/            Which Way (a round game, with a three.js compass)
+    five-clues/           Five Clues (a round game)
 ```
 
 The rule of thumb: `src/platform` never imports from a game folder, except the registry. A game imports from `src/platform` and `src/games/shared`, never from another game.
@@ -86,7 +97,7 @@ The day, and the boards with it, resets at 00:00 UTC. Yesterday's puzzle still a
 
 Daily boards are kept forever. Each game's **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress game is only kept for 3 days.
 
-The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain or Daily Heist solve 400–600, and Spectrum up to 600 for matching your server exactly.
+The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain, Daily Heist or Vowel Play solve 400–600, Spectrum up to 600 for matching your server exactly, Which Way up to 750 (about 575 for aiming 25° off on average), and Five Clues up to 750 (450 for naming all three on the third clue).
 
 ## The bot
 
@@ -122,9 +133,11 @@ If `RESULTS_WEBHOOK_TOKEN` is set, it is sent as `Authorization: Bearer <token>`
 5. **Build the UI** in `src/games/<id>/components/` and add `src/app/<id>/page.tsx`. Get the Discord session from `useDiscordConnection()`, render `<Leaderboard game={…} />` once connected, link home with `<LaunchLink href="/">`, and keep local stats with `loadStats("<id>", …)` / `recordGame`.
 6. **Test it**: put game logic in pure functions next to `*.test.ts` files; `bun test` picks them up. `src/games/crossword/server/game.test.ts` shows how to test the server side against the in-memory store.
 
-**A move-by-move puzzle** (the player builds a list of moves from a start, like Ladder's words or Daily Heist's steps, and can take them back) can likewise build on `src/platform/stepGame`: a `StepRules` (which moves are allowed, when it's solved, par and give-up points), a `StepGameDef` whose `puzzleFor` returns the day's puzzle and an answer, a three-line route from `stepGameRoute(def)` (its GET serves the puzzle, so a generator that needs server-only data, like a dictionary, never ships to the browser), and the board inside `<StepGameShell>` using `useStepGame`. `src/games/heist` is a self-contained example.
+**A move-by-move puzzle** (the player builds a list of moves from a start, like Ladder's words or Daily Heist's steps, and can take them back) can likewise build on `src/platform/stepGame`: a `StepRules` (which moves are allowed, when it's solved, par and give-up points; set `noTakebacks` if moves are final, like Vowel Play's wrong guesses), a `StepGameDef` whose `puzzleFor` returns the day's puzzle and an answer, a three-line route from `stepGameRoute(def)` (its GET serves the puzzle, so a generator that needs server-only data, like a dictionary, never ships to the browser), and the board inside `<StepGameShell>` using `useStepGame`. `src/games/heist` is a self-contained example.
 
 **A fill-the-grid game** (each cell has a right value, like Mini Sudoku or Picture Logic) can skip most of steps 3–5 by building on `src/platform/gridGame`: write a generator that returns a `GridPuzzle` for a date, a `GridRules` (cell values, how an entry matches, scoring), a `GridGameDef` for the server, a one-line route (`export const POST = gridGameRoute(def)`), and the grid UI inside `<GridGameShell>` using `useGridGame`. The engine handles saving, sync, the timer, Check, Reveal, stats, the win screen and the leaderboard. `src/games/sudoku` is the smallest example.
+
+**A round game** (a list of moves that can't be taken back, such as aims or guesses) can do the same with `src/platform/roundGame`: write a pure `play(dateKey, moves)` that returns the score and whether it's finished, a `parseMove` for the server, a one-line route (`export const POST = roundGameRoute(def)`), and the UI with `useRoundGame`. The engine handles saving, sync, play time and stats, the page adds `ResultCard` and `RoundBanner`, and the server replays the moves to score them. `src/games/five-clues` is the smallest example. Use `makeSchedule` and `Cycle` from `schedule.ts` if a date's puzzle should work through a whole pool before anything repeats.
 
 Links between pages must be `LaunchLink`s: Discord passes launch parameters in the query string, and a plain `Link` drops them.
 

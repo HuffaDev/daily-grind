@@ -29,6 +29,11 @@ export interface StepRules<P> {
   giveUpPoints(puzzle: P, moves: readonly string[]): number;
   /** Longest move list accepted. */
   maxMoves: number;
+  /**
+   * Moves are final, e.g. wrong guesses that cost points: hides Undo and
+   * Restart, and the server refuses a move list that doesn't extend the one it saved.
+   */
+  noTakebacks?: boolean;
   scoring: StepScoring;
 }
 

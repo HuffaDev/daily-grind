@@ -9,6 +9,7 @@ import { Embed, escapeMarkdown, MessageBody } from "./discord";
 export const PLAY_BUTTON_ID = "play";
 
 const COLOR = 0xf59e0b;
+const EMBED_FIELD_LIMIT = 1024;
 const BOARD_SIZE = 10;
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -108,6 +109,17 @@ export function playingMessage(players: { userId: string; name: string; lastSeen
   };
 }
 
+/** As many whole lines as fit in a Discord embed field. */
+function fitField(lines: string[]): string {
+  let value = "";
+  for (const line of lines) {
+    const next = value ? `${value}\n${line}` : line;
+    if (next.length > EMBED_FIELD_LIMIT) break;
+    value = next;
+  }
+  return value;
+}
+
 /** The post announcing `todayKey`'s puzzles in a server, with its results from the day before. */
 export async function dailyMessage(scope: string, todayKey: string): Promise<MessageBody> {
   const yesterdayKey = previousDateKey(todayKey);
@@ -119,6 +131,6 @@ export async function dailyMessage(scope: string, todayKey: string): Promise<Mes
     description: GAMES.map((game) => `${game.emoji} **${game.name}**: ${game.tagline}`).join("\n"),
     color: COLOR,
   };
-  if (best.length > 0) embed.fields = [{ name: "Yesterday's best", value: best.join("\n") }];
+  if (best.length > 0) embed.fields = [{ name: "Yesterday's best", value: fitField(best) }];
   return { embeds: [embed], components: playButton(), allowed_mentions: noPings };
 }

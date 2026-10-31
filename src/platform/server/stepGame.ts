@@ -60,6 +60,11 @@ function sanitizeMoves<P>(def: StepGameDef<P>, puzzle: P, moves: unknown): strin
   return moves;
 }
 
+/** Whether `next` keeps every move of `saved`, in order, and maybe adds more. */
+function extendsMoves(saved: readonly string[], next: readonly string[]): boolean {
+  return next.length >= saved.length && saved.every((move, i) => next[i] === move);
+}
+
 function toView<P>(def: StepGameDef<P>, puzzle: P, game: StepGameRecord): StepGameView {
   return {
     moves: game.moves,
@@ -141,7 +146,12 @@ async function updateGame<P>(
   if (!finished) {
     recordPlay(game, now, body.elapsedSeconds);
     // A give-up may come without moves (e.g. from another device); it keeps what's saved.
-    if (body.moves !== undefined || action === "progress") game.moves = sanitizeMoves(def, puzzle, body.moves);
+    if (body.moves !== undefined || action === "progress") {
+      const moves = sanitizeMoves(def, puzzle, body.moves);
+      if (!def.rules.noTakebacks || extendsMoves(game.moves, moves)) game.moves = moves;
+      // A stale give-up (e.g. from a device that's behind) still gives up, keeping what's saved.
+      else if (action === "progress") throw new GameError("Moves can't be taken back", 400);
+    }
     game.score =
       action === "giveup"
         ? { ...game.score, gaveUp: true }

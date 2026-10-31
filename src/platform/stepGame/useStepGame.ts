@@ -268,12 +268,12 @@ export function useStepGame<P>(info: GameInfo, dateKey: string, rules: StepRules
   );
 
   const undo = useCallback(() => {
-    if (!complete && moves.length > 0) setMoveList(moves.slice(0, -1));
-  }, [complete, moves, setMoveList]);
+    if (!complete && !rules.noTakebacks && moves.length > 0) setMoveList(moves.slice(0, -1));
+  }, [complete, rules.noTakebacks, moves, setMoveList]);
 
   const restart = useCallback(() => {
-    if (!complete && moves.length > 0) setMoveList([]);
-  }, [complete, moves, setMoveList]);
+    if (!complete && !rules.noTakebacks && moves.length > 0) setMoveList([]);
+  }, [complete, rules.noTakebacks, moves, setMoveList]);
 
   const giveUp = useCallback(() => {
     if (complete || !started) return;

@@ -36,5 +36,5 @@ function sortArrayBlocks(filePath, arrayNames) {
 }
 
 sortArrayBlocks("src/games/crossword/lib/wordbank.ts", ["WORDS_2", "WORDS_3", "WORDS_4", "WORDS_5"]);
-sortArrayBlocks("src/games/crossword/lib/wordbankGenerated.ts", ["GENERATED_WORDS_3", "GENERATED_WORDS_4", "GENERATED_WORDS_5"]);
-console.log("Sorted word arrays in wordbank.ts and wordbankGenerated.ts");
+sortArrayBlocks("src/games/crossword/lib/wordbankCommon.ts", ["COMMON_WORDS_3", "COMMON_WORDS_4", "COMMON_WORDS_5"]);
+console.log("Sorted word arrays in wordbank.ts and wordbankCommon.ts");
