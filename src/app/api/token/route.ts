@@ -1,4 +1,4 @@
-import { createSession } from "@/lib/server/session";
+import { createSession } from "@/platform/server/session";
 
 const DISCORD_API = "https://discord.com/api/v10";
 

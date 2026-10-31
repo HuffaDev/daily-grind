@@ -40,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local test setup (start-app.ps1 / stop-app.ps1)
+*.env
+dev.log
+dev-error.log
+.dev-server.pid
+
+# agent instruction files that `next dev` writes; kept out of the repo
+AGENTS.md
+CLAUDE.md

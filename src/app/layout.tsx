@@ -28,8 +28,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mini Crossword",
-  description: "A daily-style 5x5 mini crossword you can play in the browser.",
+  title: "Daily Grind",
+  description: "Daily puzzles and games for your Discord server, with a shared leaderboard.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

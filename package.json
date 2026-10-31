@@ -1,13 +1,14 @@
 {
-  "name": "mini-crossword",
-  "version": "0.2.0",
+  "name": "daily-grind",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "bun run --bun next dev",
     "build": "bun run --bun next build",
     "start": "bun run --bun next start",
     "lint": "bun run --bun eslint",
-    "test": "bun test"
+    "test": "bun test",
+    "register-commands": "bun --env-file=local.env scripts/register-commands.ts"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
