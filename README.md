@@ -29,6 +29,8 @@ src/
     sudoku/page.tsx
     picture-logic/page.tsx
     ladder/, anagram-chain/, spectrum/, heist/, vowel-play/
+    which-way/page.tsx
+    five-clues/page.tsx
     api/
       token/              Discord sign-in (shared)
       avatar/             Discord avatar proxy (shared)
@@ -36,7 +38,7 @@ src/
       games/crossword/    each game's own API
       games/chess/        (+ chess/puzzles: the day's puzzles, no sign-in needed)
       games/sudoku/, games/picture-logic/, games/which-way/, games/five-clues/
-      games/ladder/, games/anagram-chain/, games/heist/, gammes/vowel-play/  (GET: the day's puzzle, no sign-in needed)
+      games/ladder/, games/anagram-chain/, games/heist/, games/vowel-play/   (GET: the day's puzzle, no sign-in needed)
       games/spectrum/
       presence/           the Activity reporting who's in it, for the bot's "playing" card
       discord/interactions/  the bot's slash commands and buttons
@@ -95,7 +97,7 @@ The day, and the boards with it, resets at 00:00 UTC. Yesterday's puzzle still a
 
 Daily boards are kept forever. Each game's **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress game is only kept for 3 days.
 
-The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain or Daily Heist or Vowel Play solve 400–600, Spectrum up to 600 for matching your server exactly, Which Way up to 750 (about 575 for aiming 25° off on average), and Five Clues up to 750 (450 for naming all three on the third clue).
+The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain, Daily Heist or Vowel Play solve 400–600, Spectrum up to 600 for matching your server exactly, Which Way up to 750 (about 575 for aiming 25° off on average), and Five Clues up to 750 (450 for naming all three on the third clue).
 
 ## The bot
 
