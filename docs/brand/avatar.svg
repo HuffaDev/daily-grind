@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Daily Grind avatar: a coffee mug with a mini crossword on it. Discord crops it to a circle,
+       so everything sits inside the central circle. Render with render-avatar.ps1. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="0.6" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#b45309"/>
+    </radialGradient>
+    <linearGradient id="mug" x1="0" x2="1">
+      <stop offset="0" stop-color="#fffbeb"/>
+      <stop offset="0.75" stop-color="#fff7ed"/>
+      <stop offset="1" stop-color="#fde7c7"/>
+    </linearGradient>
+    <clipPath id="mug-shape">
+      <rect x="290" y="400" width="400" height="400" rx="64"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- shifted left so the mug and its handle together sit centered in the circle -->
+  <g transform="translate(-24 0)">
+
+  <!-- shadow -->
+  <ellipse cx="490" cy="808" rx="250" ry="30" fill="#78350f" opacity="0.35"/>
+
+  <!-- steam -->
+  <g fill="none" stroke="#fffbeb" stroke-width="26" stroke-linecap="round" opacity="0.95">
+    <path d="M400 360 c-40 -45 40 -75 0 -125"/>
+    <path d="M490 350 c-40 -50 40 -85 0 -145"/>
+    <path d="M580 360 c-40 -45 40 -75 0 -125"/>
+  </g>
+
+  <!-- handle -->
+  <path d="M672 480 C 800 480, 800 700, 672 700" fill="none" stroke="#3b2416" stroke-width="64" stroke-linecap="round"/>
+  <path d="M672 480 C 800 480, 800 700, 672 700" fill="none" stroke="#fff7ed" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- mug -->
+  <rect x="290" y="400" width="400" height="400" rx="64" fill="url(#mug)"/>
+  <rect x="290" y="400" width="400" height="56" fill="#3b2416" clip-path="url(#mug-shape)"/>
+  <rect x="290" y="400" width="400" height="400" rx="64" fill="none" stroke="#3b2416" stroke-width="24"/>
+
+  <!-- crossword: 3×3, two black squares, the "current word" in amber -->
+  <rect x="359" y="475" width="262" height="262" rx="12" fill="#3b2416"/>
+  <g stroke="#3b2416" stroke-width="10">
+    <rect x="364" y="480" width="80" height="80" rx="8" fill="#fbbf24"/>
+    <rect x="450" y="480" width="80" height="80" rx="8" fill="#fbbf24"/>
+    <rect x="536" y="480" width="80" height="80" rx="8" fill="#3b2416"/>
+    <rect x="364" y="566" width="80" height="80" rx="8" fill="#ffffff"/>
+    <rect x="450" y="566" width="80" height="80" rx="8" fill="#ffffff"/>
+    <rect x="536" y="566" width="80" height="80" rx="8" fill="#ffffff"/>
+    <rect x="364" y="652" width="80" height="80" rx="8" fill="#3b2416"/>
+    <rect x="450" y="652" width="80" height="80" rx="8" fill="#ffffff"/>
+    <rect x="536" y="652" width="80" height="80" rx="8" fill="#ffffff"/>
+  </g>
+  <g font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="58" fill="#3b2416" text-anchor="middle">
+    <text x="404" y="541">D</text>
+    <text x="490" y="541">G</text>
+  </g>
+  </g>
+</svg>

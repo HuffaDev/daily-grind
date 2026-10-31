@@ -10,6 +10,9 @@ export interface GameInfo {
   name: string;
   /** One line for the hub's game card. */
   tagline: string;
+  /** Path of the game's icon under public/, shown next to its name on the website, e.g. "/games/crossword.png". */
+  icon: string;
+  /** Stands in for the icon in Discord messages, where images can't sit inline with text. */
   emoji: string;
   /**
    * Bump whenever the puzzle a given date produces changes. Puzzle ids embed

@@ -14,7 +14,7 @@ export default function GlobalLeaderboard({ connection }: { connection: DiscordC
   return (
     <section>
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
-        Daily Grind leaderboard
+        Daily Grind: all games
       </h2>
       <BoardList rows={rows} failed={failed} myUserId={connection.user.id} />
       <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">

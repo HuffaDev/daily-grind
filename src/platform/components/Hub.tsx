@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { GAMES } from "@/games/registry";
 import { useDiscordConnection } from "@/platform/useDiscordConnection";
-import GlobalLeaderboard from "./GlobalLeaderboard";
+import HubLeaderboard from "./HubLeaderboard";
 import LaunchLink from "./LaunchLink";
 import NextPuzzleCountdown from "./NextPuzzleCountdown";
 import ThemeToggle from "./ThemeToggle";
@@ -14,11 +15,21 @@ export default function Hub() {
   return (
     <div className="max-w-3xl mx-auto p-4 short:p-2">
       <header className="flex items-start justify-between gap-3 mb-6 short:mb-2">
-        <div>
-          <h1 className="text-2xl short:text-base font-bold text-neutral-900 dark:text-neutral-50">Daily Grind</h1>
-          <p className="short:hidden text-xs text-neutral-500 dark:text-neutral-400">
-            New puzzles every day · next in <NextPuzzleCountdown />
-          </p>
+        <div className="flex items-center gap-3">
+          <Image
+            src="/daily-grind.png"
+            alt=""
+            width={48}
+            height={48}
+            priority
+            className="size-12 short:size-7 rounded-xl"
+          />
+          <div>
+            <h1 className="text-2xl short:text-base font-bold text-neutral-900 dark:text-neutral-50">Daily Grind</h1>
+            <p className="short:hidden text-xs text-neutral-500 dark:text-neutral-400">
+              New puzzles every day · next in <NextPuzzleCountdown />
+            </p>
+          </div>
         </div>
         <span className="short:hidden">
           <ThemeToggle />
@@ -32,9 +43,7 @@ export default function Hub() {
               href={`/${game.id}`}
               className="flex items-center gap-4 rounded-xl bg-white dark:bg-neutral-900 p-4 shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-800 hover:ring-amber-500 dark:hover:ring-amber-500 transition-shadow"
             >
-              <span className="text-3xl" aria-hidden>
-                {game.emoji}
-              </span>
+              <Image src={game.icon} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl" />
               <span>
                 <span className="block font-semibold text-neutral-900 dark:text-neutral-50">{game.name}</span>
                 <span className="block text-sm text-neutral-500 dark:text-neutral-400">{game.tagline}</span>
@@ -51,7 +60,7 @@ export default function Hub() {
       )}
       {connection && (
         <div className="short:hidden">
-          <GlobalLeaderboard connection={connection} />
+          <HubLeaderboard connection={connection} />
         </div>
       )}
     </div>

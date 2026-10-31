@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDailyPuzzleNumber, getUtcDateKey } from "@/platform/daily";
 import { formatTime } from "@/platform/format";
@@ -573,7 +574,17 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
           >
             ← All games
           </LaunchLink>
-          <h1 className="text-2xl short:text-base font-bold text-neutral-900 dark:text-neutral-50">{crossword.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl short:text-base font-bold text-neutral-900 dark:text-neutral-50">
+            <Image
+              src={crossword.icon}
+              alt=""
+              width={32}
+              height={32}
+              priority
+              className="size-8 short:size-5 rounded-lg"
+            />
+            {crossword.name}
+          </h1>
           <p className="short:hidden text-xs text-neutral-500 dark:text-neutral-400">
             Daily puzzle #{puzzleNumber} · same for everyone today
           </p>

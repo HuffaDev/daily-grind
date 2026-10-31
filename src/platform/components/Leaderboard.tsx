@@ -12,12 +12,14 @@ interface Props {
   puzzleId: string;
   /** The player's points as the server last saved them; a change triggers an immediate refresh. */
   myPoints: number | null;
+  /** Classes for the section; by default it's spaced below the game and hidden in very short windows. */
+  className?: string;
 }
 
 type Period = "today" | "allTime";
 
 /** A game's leaderboard for the player's server: today's puzzle, or all time. */
-export default function Leaderboard({ connection, game, puzzleId, myPoints }: Props) {
+export default function Leaderboard({ connection, game, puzzleId, myPoints, className = "short:hidden mt-6" }: Props) {
   const [period, setPeriod] = useState<Period>("today");
   const { rows: loaded, failed } = usePolledBoard<{ period: Period; rows: BoardRow[] }>(
     async () => ({
@@ -39,7 +41,7 @@ export default function Leaderboard({ connection, game, puzzleId, myPoints }: Pr
   const rows = loaded?.period === period ? loaded.rows : null;
 
   return (
-    <section className="short:hidden mt-6">
+    <section className={className}>
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
           {period === "today" ? "Today's leaderboard" : "All-time leaderboard"}

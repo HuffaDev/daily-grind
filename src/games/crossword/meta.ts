@@ -15,6 +15,7 @@ export const crossword: GameInfo = {
   id: "crossword",
   name: "Mini Crossword",
   tagline: "A 5×5 crossword, new every day.",
+  icon: "/games/crossword.png",
   emoji: "📝",
   puzzleVersion: PUZZLE_VERSION,
   summarizeToday({ solvedTimeSeconds, detail }: BoardEntry<CrosswordBoardDetail>) {

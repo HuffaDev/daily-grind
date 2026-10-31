@@ -5,6 +5,7 @@ Daily puzzles and games for Discord. Each game has a new puzzle every UTC day, t
 | Game | Folder |
 |---|---|
 | 📝 Mini Crossword: a 5×5 crossword | [`src/games/crossword`](src/games/crossword/README.md) |
+| ♟️ Daily Chess: three chess puzzles, easy to hard | [`src/games/chess`](src/games/chess/README.md) |
 
 ## How it's organized
 
@@ -13,13 +14,15 @@ It's one Next.js app. Code shared by every game lives in `src/platform/`; each g
 ```text
 src/
   app/                    Next.js routes, kept thin
-    page.tsx              the hub: game picker + Daily Grind leaderboard
+    page.tsx              the hub: game picker + leaderboards (Daily Grind and each game)
     crossword/page.tsx    one page per game
+    chess/page.tsx
     api/
       token/              Discord sign-in (shared)
       avatar/             Discord avatar proxy (shared)
       leaderboard/        ?game=…&puzzleId=… · all-time?game=… · global
       games/crossword/    each game's own API
+      games/chess/        (+ chess/puzzles: the day's puzzles, no sign-in needed)
       discord/interactions/  the bot's slash commands and buttons
       cron/daily/         the daily post, run by Vercel Cron
   bot/                    the Discord bot
@@ -44,6 +47,7 @@ src/
   games/
     registry.ts           the list of games
     crossword/            everything specific to the crossword
+    chess/                everything specific to Daily Chess
 ```
 
 The rule of thumb: `src/platform` never imports from a game folder, except the registry. A game imports from `src/platform`, never from another game.
@@ -56,7 +60,7 @@ The day, and the boards with it, resets at 00:00 UTC. Yesterday's puzzle still a
 
 Daily boards are kept forever. Each game's **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress game is only kept for 3 days.
 
-The **Daily Grind** board on the hub adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve.
+The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, and a clean Daily Chess sweep about 550–750.
 
 ## The bot
 
@@ -83,7 +87,7 @@ If `RESULTS_WEBHOOK_TOKEN` is set, it is sent as `Authorization: Bearer <token>`
 
 ## Adding a game
 
-1. **Create `src/games/<id>/meta.ts`** exporting a `GameInfo` (`id`, `name`, `tagline`, `emoji`, `puzzleVersion`, and `summarizeToday`, which turns a board row into a short summary like "✅ 1:23"), and add it to `GAMES` in `src/games/registry.ts`. The id becomes the URL and the storage namespace, so don't change it after release. The hub, the leaderboards, the daily post and `/leaderboard` all pick the game up from the registry. Run `bun run register-commands` afterwards so `/leaderboard` offers it.
+1. **Create `src/games/<id>/meta.ts`** exporting a `GameInfo` (`id`, `name`, `tagline`, `icon`, `emoji`, `puzzleVersion`, and `summarizeToday`, which turns a board row into a short summary like "✅ 1:23"), and add it to `GAMES` in `src/games/registry.ts`. Put the game's icon in `public/games/<id>.png` for the hub and the game page, and a copy at `src/app/<id>/icon.png` for its browser tab. The id becomes the URL and the storage namespace, so don't change it after release. The hub, the leaderboards, the daily post and `/leaderboard` all pick the game up from the registry. Run `bun run register-commands` afterwards so `/leaderboard` offers it.
 2. **Make the daily puzzle deterministic.** Seed it with `mulberry32(seedForDateKey(dateKey))` from `src/platform/daily.ts`, and identify it with `getPuzzleId(dateKey, PUZZLE_VERSION)`.
 3. **Write the server side** in `src/games/<id>/server/`. For each request: check the puzzle with `resolveActivePuzzle`, take the player's lock with `getStore().withGameLock(...)`, load and save your own record with `getGame` / `saveGame`, and post the player's row with `upsertEntry`. A `BoardEntry` needs `points`, `solvedTimeSeconds` (null until solved) and a `detail` object of your own. If the game is timed, add `PlayTime` to your record and score with `scoredSeconds`. Call `reportSolve` on the first solve. Never trust the client's score: recompute it on the server.
 4. **Add the API route** at `src/app/api/games/<id>/route.ts`, like the crossword's. The client reaches it with `postGameAction(connection, "<id>", body)`.
@@ -104,7 +108,7 @@ bun test     # scoring, sync, leaderboard and server tests
 
 On Windows, `start-app.cmd` and `stop-app.cmd` run the dev server in the background instead, with its output in `dev.log`. They read settings from a `local.env` file next to them, with the same names as `.env.example`; it is gitignored. Without `SESSION_SECRET` there, a random one is used for each run.
 
-In a normal browser every game runs fully locally. With no Redis configured, the API uses an in-memory store. To also run the Redis store tests, point `TEST_REDIS_URL` at a disposable database, e.g. `TEST_REDIS_URL=redis://127.0.0.1:6379/15 bun test`.
+In a normal browser every game is played locally, with no leaderboard; Daily Chess still fetches its puzzles from the app's own API. With no Redis configured, the API uses an in-memory store. To also run the Redis store tests, point `TEST_REDIS_URL` at a disposable database, e.g. `TEST_REDIS_URL=redis://127.0.0.1:6379/15 bun test`.
 
 ## Discord setup
 
