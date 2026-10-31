@@ -25,6 +25,13 @@ export interface CommandOption {
   options?: CommandOption[];
 }
 
+export interface DiscordUser {
+  id: string;
+  username: string;
+  /** Display name, if the user set one. */
+  global_name?: string | null;
+}
+
 export interface Interaction {
   /** A snowflake, so it also says when the interaction happened. */
   id: string;
@@ -32,6 +39,9 @@ export interface Interaction {
   type: number;
   guild_id?: string;
   channel_id?: string;
+  /** Who sent it, in a server; outside one, `user` instead. */
+  member?: { nick?: string | null; user: DiscordUser };
+  user?: DiscordUser;
   data?: {
     /** Slash command name. */
     name?: string;

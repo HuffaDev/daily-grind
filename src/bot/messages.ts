@@ -73,6 +73,31 @@ async function yesterdaysBest(scope: string, game: GameInfo, yesterdayKey: strin
   return top.map((e, i) => `${MEDALS[i]} ${escapeMarkdown(e.name)} · ${e.points}`).join("  ");
 }
 
+const PLAYERS_SHOWN = 15;
+
+/** The bot's card in a channel listing who's launched Daily Grind lately (see playingCard.ts). */
+export function playingMessage(players: { name: string; launchedAt: number }[]): MessageBody {
+  const lines = players
+    .slice(0, PLAYERS_SHOWN)
+    .map((p) => `🎮 ${escapeMarkdown(p.name)} · <t:${Math.floor(p.launchedAt / 1000)}:R>`);
+  if (players.length > PLAYERS_SHOWN) lines.push(`…and ${players.length - PLAYERS_SHOWN} more`);
+  // A headline like "Lux, huffa and 2 others joined in!", as other Activities do.
+  const [first, second] = players.map((p) => `**${escapeMarkdown(p.name)}**`);
+  const others = players.length - 2;
+  const who =
+    players.length === 1
+      ? first
+      : players.length === 2
+        ? `${first} and ${second}`
+        : `${first}, ${second} and ${others} other${others === 1 ? "" : "s"}`;
+  return {
+    content: `${who} joined in!`,
+    embeds: [{ title: "Daily Grind", description: lines.join("\n"), color: COLOR, footer: { text: "Press Play to join in" } }],
+    components: playButton(),
+    allowed_mentions: noPings,
+  };
+}
+
 /** The post announcing `todayKey`'s puzzles in a server, with its results from the day before. */
 export async function dailyMessage(scope: string, todayKey: string): Promise<MessageBody> {
   const yesterdayKey = previousDateKey(todayKey);

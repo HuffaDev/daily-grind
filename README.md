@@ -85,7 +85,7 @@ Every bot message has a **Play** button that opens the Activity for whoever pres
 
 The bot runs inside the same Next.js app: Discord sends commands to `/api/discord/interactions` as HTTP requests, so there's no always-on process to host. Vercel Cron calls `/api/cron/daily` at 00:00 UTC (`vercel.json`). Each server gets one post a day even if the job runs twice. If a server deletes its channel, its daily posts are turned off; if the bot just lacks permission there, it keeps trying each day.
 
-Each launch makes Discord post a "Game Invitation" card in the channel, and leaving and rejoining posts another. To keep channels tidy, the Activity's Launch command is handled by the app (`register-commands` sets this), and after each launch the bot deletes its earlier launch cards from the past hour, so only the newest one is left, with its live player count (`src/bot/launchCards.ts`). The bot needs Read Message History for this; without it, cards are just left alone.
+The bot launches the Activity itself, for `/play`, the Play button and the Activity's Launch command (`register-commands` points Launch at the app), so Discord doesn't post a "Game Invitation" card for every launch. Instead the bot keeps one "Playing Daily Grind" card per channel listing who's joined, editing it on each launch; once an hour passes with no one joining, the next launch starts a new card (`src/bot/playingCard.ts`).
 
 ### Results webhook (optional)
 
@@ -139,6 +139,6 @@ In a normal browser every game is played locally, with no leaderboard; Daily Che
 8. Deploy to Vercel and set the variables from `.env.example`, including a random `CRON_SECRET`. Redeploy after adding variables so they take effect.
 9. **General Information → Interactions Endpoint URL**: `https://<your host>/api/discord/interactions`. Discord checks the endpoint when you save, so deploy (with `DISCORD_PUBLIC_KEY` set) first.
 10. Register the slash commands: fill in `local.env` and run `bun run register-commands`. Run it again whenever `src/bot/commands.ts` or the list of games changes. It also points the Activity's Launch command at the app.
-11. **Installation**: under Guild Install, add the scopes `applications.commands` and `bot` with the permissions **View Channels**, **Send Messages**, **Embed Links** and **Read Message History** (for clearing old launch cards), then use the install link to add Daily Grind to a server.
+11. **Installation**: under Guild Install, add the scopes `applications.commands` and `bot` with the permissions **View Channels**, **Send Messages**, **Embed Links** and **Read Message History**, then use the install link to add Daily Grind to a server.
 
 For local testing inside Discord, expose `bun run dev` through a tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) and point the `/` mapping at it. `next.config.ts` already allows `*.discordsays.com` as a dev origin, which the dev server needs to accept requests coming through Discord.
