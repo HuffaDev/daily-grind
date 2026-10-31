@@ -6,6 +6,8 @@ Daily puzzles and games for Discord. Each game has a new puzzle every UTC day, t
 |---|---|
 | 📝 Mini Crossword: a 5×5 crossword | [`src/games/crossword`](src/games/crossword/README.md) |
 | ♟️ Daily Chess: three chess puzzles, easy to hard | [`src/games/chess`](src/games/chess/README.md) |
+| 🔢 Mini Sudoku: a 6×6 sudoku, easy Monday to tough Sunday | [`src/games/sudoku`](src/games/sudoku/README.md) |
+| 🖼️ Picture Logic: a 10×10 nonogram that draws a picture | [`src/games/picture-logic`](src/games/picture-logic/README.md) |
 
 ## How it's organized
 
@@ -17,12 +19,15 @@ src/
     page.tsx              the hub: game picker + leaderboards (Daily Grind and each game)
     crossword/page.tsx    one page per game
     chess/page.tsx
+    sudoku/page.tsx
+    picture-logic/page.tsx
     api/
       token/              Discord sign-in (shared)
       avatar/             Discord avatar proxy (shared)
       leaderboard/        ?game=…&puzzleId=… · all-time?game=… · global
       games/crossword/    each game's own API
       games/chess/        (+ chess/puzzles: the day's puzzles, no sign-in needed)
+      games/sudoku/, games/picture-logic/
       discord/interactions/  the bot's slash commands and buttons
       cron/daily/         the daily post, run by Vercel Cron
   bot/                    the Discord bot
@@ -37,10 +42,13 @@ src/
     discordClient.ts      Discord SDK handshake and API calls
     useDiscordConnection.ts
     components/           Hub, leaderboards, share button, countdown, theme toggle
+    gridGame/             shared engine for fill-the-grid games: rules and scoring,
+                          useGridGame (state, sync, timer, Check/Reveal), GridGameShell (the page)
     server/
       store.ts            Redis / Upstash / in-memory storage, namespaced by game
       session.ts          signed session issued after Discord sign-in
       games.ts            GameError, active-puzzle check, anti-cheat play time
+      gridGame.ts         grid games' API: applyGridAction, gridGameRoute
       leaderboard.ts      daily, all-time and global boards
       standings.ts        all-time and global totals
       webhook.ts          optional results webhook
@@ -48,6 +56,8 @@ src/
     registry.ts           the list of games
     crossword/            everything specific to the crossword
     chess/                everything specific to Daily Chess
+    sudoku/               Mini Sudoku (on the grid engine)
+    picture-logic/        Picture Logic (on the grid engine)
 ```
 
 The rule of thumb: `src/platform` never imports from a game folder, except the registry. A game imports from `src/platform`, never from another game.
@@ -60,7 +70,7 @@ The day, and the boards with it, resets at 00:00 UTC. Yesterday's puzzle still a
 
 Daily boards are kept forever. Each game's **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress game is only kept for 3 days.
 
-The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, and a clean Daily Chess sweep about 550–750.
+The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, and a Mini Sudoku or Picture Logic solve 450–650.
 
 ## The bot
 
@@ -93,6 +103,8 @@ If `RESULTS_WEBHOOK_TOKEN` is set, it is sent as `Authorization: Bearer <token>`
 4. **Add the API route** at `src/app/api/games/<id>/route.ts`, like the crossword's. The client reaches it with `postGameAction(connection, "<id>", body)`.
 5. **Build the UI** in `src/games/<id>/components/` and add `src/app/<id>/page.tsx`. Get the Discord session from `useDiscordConnection()`, render `<Leaderboard game={…} />` once connected, link home with `<LaunchLink href="/">`, and keep local stats with `loadStats("<id>", …)` / `recordGame`.
 6. **Test it**: put game logic in pure functions next to `*.test.ts` files; `bun test` picks them up. `src/games/crossword/server/game.test.ts` shows how to test the server side against the in-memory store.
+
+**A fill-the-grid game** (each cell has a right value, like Mini Sudoku or Picture Logic) can skip most of steps 3–5 by building on `src/platform/gridGame`: write a generator that returns a `GridPuzzle` for a date, a `GridRules` (cell values, how an entry matches, scoring), a `GridGameDef` for the server, a one-line route (`export const POST = gridGameRoute(def)`), and the grid UI inside `<GridGameShell>` using `useGridGame`. The engine handles saving, sync, the timer, Check, Reveal, stats, the win screen and the leaderboard. `src/games/sudoku` is the smallest example.
 
 Links between pages must be `LaunchLink`s: Discord passes launch parameters in the query string, and a plain `Link` drops them.
 
