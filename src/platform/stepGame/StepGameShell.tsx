@@ -110,17 +110,21 @@ export default function StepGameShell<P>({ info, rules, game, dateKey, onPlayDat
               </span>
               {playing && (
                 <>
-                  <button type="button" onClick={game.undo} disabled={game.moves.length === 0} className={buttonClass}>
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={game.restart}
-                    disabled={game.moves.length === 0}
-                    className={`short:hidden ${buttonClass}`}
-                  >
-                    Restart
-                  </button>
+                  {!rules.noTakebacks && (
+                    <>
+                      <button type="button" onClick={game.undo} disabled={game.moves.length === 0} className={buttonClass}>
+                        Undo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={game.restart}
+                        disabled={game.moves.length === 0}
+                        className={`short:hidden ${buttonClass}`}
+                      >
+                        Restart
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => {

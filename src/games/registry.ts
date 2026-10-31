@@ -7,6 +7,7 @@ import { ladder } from "./ladder/meta";
 import { pictureLogic } from "./picture-logic/meta";
 import { spectrum } from "./spectrum/meta";
 import { sudoku } from "./sudoku/meta";
+import { vowelPlay } from "./vowel-play/meta";
 import { whichWay } from "./which-way/meta";
 import type { GameInfo } from "./types";
 
@@ -22,6 +23,7 @@ export const GAMES: readonly GameInfo[] = [
   anagramChain,
   spectrum,
   heist,
+  vowelPlay,
   whichWay,
   fiveClues,
 ];
