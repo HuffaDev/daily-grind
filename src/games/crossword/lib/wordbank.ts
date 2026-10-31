@@ -1,4 +1,4 @@
-import { GENERATED_WORDS_3, GENERATED_WORDS_4, GENERATED_WORDS_5 } from "./wordbankGenerated";
+import { COMMON_WORDS_3, COMMON_WORDS_4, COMMON_WORDS_5 } from "./wordbankCommon";
 
 export interface WordEntry {
   word: string;
@@ -760,11 +760,11 @@ export const WORDS_5: WordEntry[] = [
 
 export const WORD_BANK: Record<2 | 3 | 4 | 5, WordEntry[]> = {
   2: dedupe(WORDS_2),
-  // Hand-curated words are listed first so their clues win over the
-  // generated ones when the same word appears in both.
-  3: dedupe([...WORDS_3, ...GENERATED_WORDS_3]),
-  4: dedupe([...WORDS_4, ...GENERATED_WORDS_4]),
-  5: dedupe([...WORDS_5, ...GENERATED_WORDS_5]),
+  // The lists above come first so their clues win over wordbankCommon's
+  // when the same word appears in both.
+  3: dedupe([...WORDS_3, ...COMMON_WORDS_3]),
+  4: dedupe([...WORDS_4, ...COMMON_WORDS_4]),
+  5: dedupe([...WORDS_5, ...COMMON_WORDS_5]),
 };
 
 function dedupe(entries: WordEntry[]): WordEntry[] {
