@@ -25,6 +25,18 @@ const PROGRESS_DEBOUNCE_MS = 600;
 /** Keeps the server's play-time measurement alive while the timer runs (see ACTIVE_GAP_CAP_MS). */
 const HEARTBEAT_MS = 15_000;
 
+/**
+ * Index of the first cell of `slot` that isn't locked, starting at `from` and
+ * moving by `step` (1 forwards, -1 backwards); null if every one is locked.
+ */
+function openCellIndex(slot: Slot, locked: Set<string>, from: number, step: 1 | -1): number | null {
+  for (let i = from; i >= 0 && i < slot.cellCoords.length; i += step) {
+    const [r, c] = slot.cellCoords[i];
+    if (!locked.has(key(r, c))) return i;
+  }
+  return null;
+}
+
 export default function Crossword() {
   // The date key picks the puzzle, which is identical for every player that
   // day. Keying on it gives each day's puzzle a completely fresh game state.
@@ -113,16 +125,36 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     saveDailyProgress({ puzzleId, userGrid, elapsedSeconds: elapsed, complete, score, lockedCells: [...lockedCells] });
   }, [progressLoaded, puzzleId, userGrid, elapsed, complete, score, lockedCells]);
 
-  // A lock only holds while its letter is still right (a synced grid from
-  // another device can differ), so a stale lock never traps a wrong letter.
+  // Words currently filled in correctly. After a reveal, only the ones the
+  // player solved themselves count, so the revealed rest doesn't show as theirs.
+  const solvedSlotIds = useMemo(() => {
+    if (score.revealed) return new Set(score.solvedWords);
+    return new Set(
+      puzzle.slots
+        .filter((s) => s.cellCoords.every(([r, c]) => userGrid[r]?.[c] === puzzle.cells[r][c].solution))
+        .map((s) => s.id)
+    );
+  }, [puzzle, userGrid, score.revealed, score.solvedWords]);
+
+  const solvedCells = useMemo(
+    () =>
+      new Set(
+        puzzle.slots.filter((s) => solvedSlotIds.has(s.id)).flatMap((s) => s.cellCoords.map(([r, c]) => key(r, c)))
+      ),
+    [puzzle, solvedSlotIds]
+  );
+
+  // Letters that can't change: those in solved words, and those a Check
+  // confirmed. A Check lock only holds while its letter is still right (a
+  // synced grid from another device can differ), so it never traps a wrong one.
   const locked = useMemo(() => {
-    const result = new Set<string>();
+    const result = new Set(solvedCells);
     for (const k of lockedCells) {
       const [r, c] = k.split(",").map(Number);
       if (userGrid[r]?.[c] && userGrid[r][c] === puzzle.cells[r]?.[c]?.solution) result.add(k);
     }
     return result;
-  }, [lockedCells, userGrid, puzzle]);
+  }, [solvedCells, lockedCells, userGrid, puzzle]);
 
   // Inside Discord, sign in so progress counts toward the server's leaderboard.
   // In a plain browser the game stays fully local.
@@ -315,26 +347,51 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     [maps, selected, direction]
   );
 
+  const moveTo = useCallback((r: number, c: number) => {
+    setSelected({ row: r, col: c });
+    gridRef.current?.focusCell(r, c);
+  }, []);
+
+  /** Selects `slot` at its first unlocked cell (its start if it's all locked). */
+  const goToSlot = useCallback(
+    (slot: Slot) => {
+      const [r, c] = slot.cellCoords[openCellIndex(slot, locked, 0, 1) ?? 0];
+      setDirection(slot.direction);
+      moveTo(r, c);
+    },
+    [locked, moveTo]
+  );
+
+  /** The next slot after `slot` (or before, for step -1) that still has an unlocked cell. */
+  const nextOpenSlot = useCallback(
+    (slot: Slot, step: 1 | -1): Slot | null => {
+      const n = maps.ordered.length;
+      const idx = maps.ordered.findIndex((s) => s.id === slot.id);
+      for (let i = 1; i <= n; i++) {
+        const candidate = maps.ordered[(idx + step * i + n * n) % n];
+        if (openCellIndex(candidate, locked, 0, 1) !== null) return candidate;
+      }
+      return null;
+    },
+    [maps, locked]
+  );
+
+  // Moves to the next unlocked cell of the word, or on to the next word with one.
   const advance = useCallback(
     (r: number, c: number) => {
       const slot = slotAt(maps, r, c, direction);
       if (!slot) return;
       const idx = slot.cellCoords.findIndex(([rr, cc]) => rr === r && cc === c);
-      if (idx < slot.cellCoords.length - 1) {
-        const [nr, nc] = slot.cellCoords[idx + 1];
-        setSelected({ row: nr, col: nc });
-        gridRef.current?.focusCell(nr, nc);
-      } else {
-        const orderIdx = maps.ordered.findIndex((s) => s.id === slot.id);
-        const nextSlot = maps.ordered[(orderIdx + 1) % maps.ordered.length];
-        if (nextSlot) {
-          setSelected({ row: nextSlot.row, col: nextSlot.col });
-          setDirection(nextSlot.direction);
-          gridRef.current?.focusCell(nextSlot.row, nextSlot.col);
-        }
+      const next = openCellIndex(slot, locked, idx + 1, 1);
+      if (next !== null) {
+        const [nr, nc] = slot.cellCoords[next];
+        moveTo(nr, nc);
+        return;
       }
+      const nextSlot = nextOpenSlot(slot, 1);
+      if (nextSlot) goToSlot(nextSlot);
     },
-    [maps, direction]
+    [maps, direction, locked, moveTo, nextOpenSlot, goToSlot]
   );
 
   const handleType = useCallback(
@@ -371,23 +428,22 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         clearWrong(r, c);
         return;
       }
+      // Steps back over locked letters to the previous one that can change.
       const slot = slotAt(maps, r, c, direction);
       if (!slot) return;
       const idx = slot.cellCoords.findIndex(([rr, cc]) => rr === r && cc === c);
-      if (idx > 0) {
-        const [pr, pc] = slot.cellCoords[idx - 1];
-        if (!locked.has(key(pr, pc))) {
-          setUserGrid((prev) => {
-            const next = prev.map((row) => [...row]);
-            next[pr][pc] = "";
-            return next;
-          });
-        }
-        setSelected({ row: pr, col: pc });
-        gridRef.current?.focusCell(pr, pc);
-      }
+      const prevIdx = openCellIndex(slot, locked, idx - 1, -1);
+      if (prevIdx === null) return;
+      const [pr, pc] = slot.cellCoords[prevIdx];
+      setUserGrid((prev) => {
+        const next = prev.map((row) => [...row]);
+        next[pr][pc] = "";
+        return next;
+      });
+      clearWrong(pr, pc);
+      moveTo(pr, pc);
     },
-    [complete, userGrid, locked, maps, direction, clearWrong]
+    [complete, userGrid, locked, maps, direction, clearWrong, moveTo]
   );
 
   const handleArrow = useCallback(
@@ -421,14 +477,13 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     (r: number, c: number, shift: boolean) => {
       const slot = slotAt(maps, r, c, direction) ?? slotAt(maps, r, c, direction === "across" ? "down" : "across");
       if (!slot) return;
+      // Skips solved words; once everything is locked, just cycles through them.
+      const step = shift ? -1 : 1;
+      const n = maps.ordered.length;
       const idx = maps.ordered.findIndex((s) => s.id === slot.id);
-      const nextIdx = shift ? (idx - 1 + maps.ordered.length) % maps.ordered.length : (idx + 1) % maps.ordered.length;
-      const nextSlot = maps.ordered[nextIdx];
-      setSelected({ row: nextSlot.row, col: nextSlot.col });
-      setDirection(nextSlot.direction);
-      gridRef.current?.focusCell(nextSlot.row, nextSlot.col);
+      goToSlot(nextOpenSlot(slot, step) ?? maps.ordered[(idx + step + n) % n]);
     },
-    [maps, direction]
+    [maps, direction, nextOpenSlot, goToSlot]
   );
 
   const handleKeyDown = useCallback(
@@ -464,11 +519,6 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
     [handleType, handleBackspace, handleArrow, handleTab, handleCellSelect, clearWrong, locked]
   );
 
-  const selectSlot = useCallback((slot: Slot) => {
-    setSelected({ row: slot.row, col: slot.col });
-    setDirection(slot.direction);
-    gridRef.current?.focusCell(slot.row, slot.col);
-  }, []);
 
   /** Marks wrong letters among `cells` in red and locks the correct ones. */
   const checkCells = useCallback(
@@ -621,6 +671,7 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
           highlighted={highlighted}
           wrongCells={wrongCells}
           lockedCells={locked}
+          solvedCells={solvedCells}
           locked={complete}
           onSelect={handleCellSelect}
           onKeyDown={handleKeyDown}
@@ -629,8 +680,8 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
         />
 
         <div className="short:hidden flex-1 grid grid-cols-2 gap-4">
-          <ClueList title="Across" slots={acrossSlots} activeSlotId={activeSlot?.id ?? null} onSelect={selectSlot} />
-          <ClueList title="Down" slots={downSlots} activeSlotId={activeSlot?.id ?? null} onSelect={selectSlot} />
+          <ClueList title="Across" slots={acrossSlots} activeSlotId={activeSlot?.id ?? null} onSelect={goToSlot} solvedIds={solvedSlotIds} />
+          <ClueList title="Down" slots={downSlots} activeSlotId={activeSlot?.id ?? null} onSelect={goToSlot} solvedIds={solvedSlotIds} />
         </div>
       </div>
 

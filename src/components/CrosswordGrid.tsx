@@ -14,8 +14,10 @@ interface Props {
   selected: { row: number; col: number };
   highlighted: Set<string>;
   wrongCells: Set<string>;
-  /** Letters a Check confirmed correct, shown in green. */
+  /** Letters that can't change (Check-confirmed or in a solved word), shown in green. */
   lockedCells: Set<string>;
+  /** Cells of correctly solved words, shaded green. */
+  solvedCells: Set<string>;
   locked?: boolean;
   onSelect: (r: number, c: number) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => void;
@@ -40,7 +42,7 @@ function typedLetter(value: string, previous: string): string | null {
 }
 
 const CrosswordGrid = forwardRef<CrosswordGridHandle, Props>(function CrosswordGrid(
-  { puzzle, userGrid, selected, highlighted, wrongCells, lockedCells, locked = false, onSelect, onKeyDown, onInputLetter, onInputClear },
+  { puzzle, userGrid, selected, highlighted, wrongCells, lockedCells, solvedCells, locked = false, onSelect, onKeyDown, onInputLetter, onInputClear },
   ref
 ) {
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -76,7 +78,13 @@ const CrosswordGrid = forwardRef<CrosswordGridHandle, Props>(function CrosswordG
           <div
             key={k}
             className={`relative rounded-[2px] ${
-              isSelected ? "bg-amber-300" : isHighlighted ? "bg-blue-100" : "bg-white"
+              isSelected
+                ? "bg-amber-300"
+                : isHighlighted
+                  ? "bg-blue-100"
+                  : solvedCells.has(k)
+                    ? "bg-green-100"
+                    : "bg-white"
             }`}
           >
             {cell.number !== null && (
