@@ -12,6 +12,7 @@ Daily puzzles and games for Discord. Each game has a new puzzle every UTC day, t
 | 🔤 Anagram Chain: grow a 3-letter word into a 7-letter one | [`src/games/anagram-chain`](src/games/anagram-chain/README.md) |
 | 🎚️ Spectrum: place things on a scale, scored against your server's average | [`src/games/spectrum`](src/games/spectrum/README.md) |
 | 💰 Daily Heist: grab the loot and slip past the guards | [`src/games/heist`](src/games/heist/README.md) |
+| 🎬 Vowel Play: name films and TV shows with their vowels missing | [`src/games/vowel-play`](src/games/vowel-play/README.md) |
 
 ## How it's organized
 
@@ -25,7 +26,7 @@ src/
     chess/page.tsx
     sudoku/page.tsx
     picture-logic/page.tsx
-    ladder/, anagram-chain/, spectrum/, heist/
+    ladder/, anagram-chain/, spectrum/, heist/, vowel-play/
     api/
       token/              Discord sign-in (shared)
       avatar/             Discord avatar proxy (shared)
@@ -33,7 +34,7 @@ src/
       games/crossword/    each game's own API
       games/chess/        (+ chess/puzzles: the day's puzzles, no sign-in needed)
       games/sudoku/, games/picture-logic/
-      games/ladder/, games/anagram-chain/, games/heist/   (GET: the day's puzzle, no sign-in needed)
+      games/ladder/, games/anagram-chain/, games/heist/, games/vowel-play/   (GET: the day's puzzle, no sign-in needed)
       games/spectrum/
       presence/           the Activity reporting who's in it, for the bot's "playing" card
       discord/interactions/  the bot's slash commands and buttons
@@ -72,6 +73,7 @@ src/
     ladder/               Ladder (on the step engine)
     anagram-chain/        Anagram Chain (on the step engine)
     heist/                Daily Heist (on the step engine)
+    vowel-play/           Vowel Play (on the step engine)
     spectrum/             Spectrum (scored against everyone in the server)
     shared/words/         the word lists Ladder and Anagram Chain use
 ```
@@ -86,7 +88,7 @@ The day, and the boards with it, resets at 00:00 UTC. Yesterday's puzzle still a
 
 Daily boards are kept forever. Each game's **All time** tab totals them per server: points, puzzles solved out of played (✅), wins (🏆, days a player topped the board with a solve, not counting today), best time (⚡) and current solve streak (🔥). Each player's in-progress game is only kept for 3 days.
 
-The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain or Daily Heist solve 400–600, and Spectrum up to 600 for matching your server exactly.
+The hub shows the **Daily Grind** board, with a tab beside it for each game's own board (Today / All time, the same one as on the game's page). The Daily Grind board adds up every game: total points, solves, wins, and a streak of days in a row with at least one game solved. Points from different games are simply added, so keep each game's scoring on a similar scale; a crossword solve is worth about 520–740, around 600 for a three-minute solve, a clean Daily Chess sweep about 550–750, a Mini Sudoku or Picture Logic solve 450–650, a Ladder, Anagram Chain, Daily Heist or Vowel Play solve 400–600, and Spectrum up to 600 for matching your server exactly.
 
 ## The bot
 
@@ -122,7 +124,7 @@ If `RESULTS_WEBHOOK_TOKEN` is set, it is sent as `Authorization: Bearer <token>`
 5. **Build the UI** in `src/games/<id>/components/` and add `src/app/<id>/page.tsx`. Get the Discord session from `useDiscordConnection()`, render `<Leaderboard game={…} />` once connected, link home with `<LaunchLink href="/">`, and keep local stats with `loadStats("<id>", …)` / `recordGame`.
 6. **Test it**: put game logic in pure functions next to `*.test.ts` files; `bun test` picks them up. `src/games/crossword/server/game.test.ts` shows how to test the server side against the in-memory store.
 
-**A move-by-move puzzle** (the player builds a list of moves from a start, like Ladder's words or Daily Heist's steps, and can take them back) can likewise build on `src/platform/stepGame`: a `StepRules` (which moves are allowed, when it's solved, par and give-up points), a `StepGameDef` whose `puzzleFor` returns the day's puzzle and an answer, a three-line route from `stepGameRoute(def)` (its GET serves the puzzle, so a generator that needs server-only data, like a dictionary, never ships to the browser), and the board inside `<StepGameShell>` using `useStepGame`. `src/games/heist` is a self-contained example.
+**A move-by-move puzzle** (the player builds a list of moves from a start, like Ladder's words or Daily Heist's steps, and can take them back) can likewise build on `src/platform/stepGame`: a `StepRules` (which moves are allowed, when it's solved, par and give-up points; set `noTakebacks` if moves are final, like Vowel Play's wrong guesses), a `StepGameDef` whose `puzzleFor` returns the day's puzzle and an answer, a three-line route from `stepGameRoute(def)` (its GET serves the puzzle, so a generator that needs server-only data, like a dictionary, never ships to the browser), and the board inside `<StepGameShell>` using `useStepGame`. `src/games/heist` is a self-contained example.
 
 **A fill-the-grid game** (each cell has a right value, like Mini Sudoku or Picture Logic) can skip most of steps 3–5 by building on `src/platform/gridGame`: write a generator that returns a `GridPuzzle` for a date, a `GridRules` (cell values, how an entry matches, scoring), a `GridGameDef` for the server, a one-line route (`export const POST = gridGameRoute(def)`), and the grid UI inside `<GridGameShell>` using `useGridGame`. The engine handles saving, sync, the timer, Check, Reveal, stats, the win screen and the leaderboard. `src/games/sudoku` is the smallest example.
 

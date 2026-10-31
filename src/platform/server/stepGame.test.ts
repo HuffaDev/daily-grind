@@ -51,6 +51,22 @@ describe("applyStepAction", () => {
     expect(game).toMatchObject({ moves: ["1", "2"], score: { gaveUp: true, solvedTimeSeconds: null }, points: 20 });
   });
 
+  it("refuses taking moves back when the rules say moves are final", async () => {
+    const finalDef: StepGameDef<number> = {
+      ...def,
+      info: { ...info, id: "test-step-final" },
+      rules: { ...COUNT_RULES, noTakebacks: true },
+    };
+    const player = newPlayer();
+    await applyStepAction(finalDef, player, puzzleId, "progress", { moves: ["1", "2"] });
+    await expect(applyStepAction(finalDef, player, puzzleId, "progress", { moves: ["1"] })).rejects.toThrow(
+      "Moves can't be taken back"
+    );
+    // A stale give-up still gives up, keeping the saved moves.
+    const { game } = await applyStepAction(finalDef, player, puzzleId, "giveup", { moves: ["1"] });
+    expect(game).toMatchObject({ moves: ["1", "2"], score: { gaveUp: true } });
+  });
+
   it("serves the puzzle, and an answer only when asked", async () => {
     const { GET } = stepGameRoute(def);
     const res = await GET(new Request(`http://test/api?puzzleId=${puzzleId}`));
