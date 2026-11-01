@@ -53,6 +53,24 @@ export interface PresenceUpdate {
 const STORE_ID = "bot";
 const STORE_KEY = "playing-card";
 
+/**
+ * A card as saved, brought up to date: cards saved before the bot tracked
+ * Activity instances have no `instances`, and their players a `launchedAt`
+ * instead of `lastSeenAt`.
+ */
+export function upgradeCard(saved: PlayingCard | null): PlayingCard | null {
+  if (!saved) return null;
+  type OldPlayer = Omit<Player, "lastSeenAt"> & { lastSeenAt?: number; launchedAt?: number };
+  return {
+    ...saved,
+    instances: saved.instances ?? {},
+    players: (saved.players as OldPlayer[]).map(({ launchedAt, ...p }) => ({
+      ...p,
+      lastSeenAt: p.lastSeenAt ?? launchedAt ?? saved.updatedAt,
+    })),
+  };
+}
+
 /** Everyone currently in one of the channel's Activity instances. */
 export function playingNow(card: PlayingCard): Set<string> {
   return new Set(Object.values(card.instances).flatMap((i) => i.users));
@@ -94,7 +112,7 @@ export async function reportPresence(session: Session, channelId: string, instan
   try {
     // Locked per channel, so reports landing together don't both post a card.
     await store.withGameLock(STORE_ID, STORE_KEY, channelId, async () => {
-      const saved = await store.getGame<PlayingCard>(STORE_ID, STORE_KEY, channelId);
+      const saved = upgradeCard(await store.getGame<PlayingCard>(STORE_ID, STORE_KEY, channelId));
       const snapshot = saved?.instances[instanceId];
       let users: string[] | null;
       if (!leaving && snapshot && Date.now() - snapshot.checkedAt < RECHECK_MS && snapshot.users.includes(session.userId)) {

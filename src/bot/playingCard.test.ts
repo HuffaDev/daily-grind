@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { playingMessage } from "./messages";
-import { applyPresence, CARD_WINDOW_MS, PlayingCard, playingNow, PresenceUpdate } from "./playingCard";
+import { applyPresence, CARD_WINDOW_MS, PlayingCard, playingNow, PresenceUpdate, upgradeCard } from "./playingCard";
 
 const lux = { userId: "1", name: "Lux" };
 const huffa = { userId: "2", name: "huffa" };
@@ -65,5 +65,19 @@ describe("playingMessage", () => {
   it("says who was playing once everyone has left", () => {
     expect(playingMessage(players, new Set()).content).toBe("**Lux**, **huffa** and 2 others were playing");
     expect(playingMessage(players.slice(3), new Set()).content).toBe("**ichi** was playing");
+  });
+});
+
+describe("upgradeCard", () => {
+  // Regression: a card saved by the earlier bot had no instances, so every
+  // report crashed reading it and the card was never replaced.
+  it("reads cards saved before instances were tracked", () => {
+    const old = { messageId: "m1", updatedAt: 1_000, players: [{ userId: "1", name: "Lux", launchedAt: 1_000 }] };
+    const card = upgradeCard(old as unknown as PlayingCard)!;
+    expect(card.instances).toEqual({});
+    expect(card.players).toEqual([{ userId: "1", name: "Lux", lastSeenAt: 1_000 }]);
+    const next = applyPresence(card, report(huffa, ["2"]), 1_000 + CARD_WINDOW_MS)!;
+    expect(next.messageId).toBeNull();
+    expect(next.players.map((p) => p.name)).toEqual(["huffa"]);
   });
 });
