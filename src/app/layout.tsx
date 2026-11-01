@@ -8,11 +8,8 @@ import "./globals.css";
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
-    var stored = localStorage.getItem("theme");
-    // Inside a Discord Activity (frame_id param) default to dark to match the client.
-    var inDiscord = new URLSearchParams(location.search).has("frame_id");
-    var dark = stored ? stored === "dark" : inDiscord || window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", dark);
+    // Dark unless the player switched to light, matching Discord's client.
+    document.documentElement.classList.toggle("dark", localStorage.getItem("theme") !== "light");
   } catch (e) {}
 })();
 `;
