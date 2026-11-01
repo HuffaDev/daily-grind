@@ -10,12 +10,15 @@ import LaunchLink from "../components/LaunchLink";
 import Leaderboard from "../components/Leaderboard";
 import NextPuzzleCountdown from "../components/NextPuzzleCountdown";
 import ShareButton from "../components/ShareButton";
+import GameManual, { Manual } from "../components/GameManual";
 import ThemeToggle from "../components/ThemeToggle";
 import { buildStepShareText, StepRules } from "./rules";
 import type { StepGame } from "./useStepGame";
 
 interface Props<P> {
   info: GameInfo;
+  /** The game's How to play guide. */
+  manual: Manual;
   rules: StepRules<P>;
   game: StepGame<P>;
   dateKey: string;
@@ -32,7 +35,7 @@ const buttonClass =
   "px-3 py-1.5 rounded-md text-sm font-medium bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700 disabled:opacity-50 transition-colors";
 
 /** The page around a step game: header, Start screen, Undo/Restart/Give up, results, stats and leaderboard. */
-export default function StepGameShell<P>({ info, rules, game, dateKey, onPlayDate, intro, shareDetail, children }: Props<P>) {
+export default function StepGameShell<P>({ info, manual, rules, game, dateKey, onPlayDate, intro, shareDetail, children }: Props<P>) {
   // Stays on this puzzle past 00:00 UTC so a game in progress can be
   // finished (the server still accepts yesterday's); the player moves on.
   const today = useUtcDateKey();
@@ -141,6 +144,9 @@ export default function StepGameShell<P>({ info, rules, game, dateKey, onPlayDat
               )}
             </>
           )}
+          <span className="short:hidden">
+            <GameManual gameId={info.id} name={info.name} manual={manual} />
+          </span>
           <span className="short:hidden">
             <ThemeToggle />
           </span>

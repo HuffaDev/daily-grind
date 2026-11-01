@@ -6,6 +6,7 @@ import GridGameShell from "@/platform/gridGame/GridGameShell";
 import { key } from "@/platform/gridGame/rules";
 import { useGridGame } from "@/platform/gridGame/useGridGame";
 import { pictureLogic } from "../meta";
+import { pictureLogicManual } from "../manual";
 import { FILLED, generateDailyPicture, lineClue, MARKED, PICTURE_RULES, SIZE } from "../lib/generator";
 
 export default function PictureLogic() {
@@ -103,6 +104,7 @@ function PictureDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (dat
   return (
     <GridGameShell
       info={pictureLogic}
+      manual={pictureLogicManual}
       rules={PICTURE_RULES}
       game={game}
       dateKey={dateKey}

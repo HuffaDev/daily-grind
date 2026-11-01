@@ -12,8 +12,10 @@ import LaunchLink from "@/platform/components/LaunchLink";
 import Leaderboard from "@/platform/components/Leaderboard";
 import NextPuzzleCountdown from "@/platform/components/NextPuzzleCountdown";
 import ShareButton from "@/platform/components/ShareButton";
+import GameManual from "@/platform/components/GameManual";
 import ThemeToggle from "@/platform/components/ThemeToggle";
 import { crossword } from "../meta";
+import { crosswordManual } from "../manual";
 import { postCrosswordAction } from "../lib/api";
 import { generateDailyPuzzle, getPuzzleId } from "../lib/generator";
 import { Direction, Slot } from "../lib/types";
@@ -628,6 +630,9 @@ function DailyCrossword({ dateKey, onPlayDate }: DailyCrosswordProps) {
               </button>
             </>
           )}
+          <span className="short:hidden">
+            <GameManual gameId={crossword.id} name={crossword.name} manual={crosswordManual} />
+          </span>
           <span className="short:hidden">
             <ThemeToggle />
           </span>

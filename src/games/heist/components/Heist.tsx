@@ -5,6 +5,7 @@ import { getUtcDateKey } from "@/platform/daily";
 import StepGameShell from "@/platform/stepGame/StepGameShell";
 import { useStepGame } from "@/platform/stepGame/useStepGame";
 import { heist } from "../meta";
+import { heistManual } from "../manual";
 import { guardAt, guardSight, HEIST_RULES, HeistPuzzle, SIZE, stateAfter } from "../lib/heist";
 
 export default function Heist() {
@@ -67,6 +68,7 @@ function HeistDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (dateK
   return (
     <StepGameShell
       info={heist}
+      manual={heistManual}
       rules={HEIST_RULES}
       game={game}
       dateKey={dateKey}

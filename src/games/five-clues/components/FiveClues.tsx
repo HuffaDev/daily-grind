@@ -6,7 +6,7 @@ import { getDailyPuzzleNumber, getUtcDateKey } from "@/platform/daily";
 import { isInDiscord } from "@/platform/discordClient";
 import { hand } from "@/platform/roundGame/fonts";
 import GameHeader from "@/platform/roundGame/GameHeader";
-import HowToPlay from "@/platform/roundGame/HowToPlay";
+import GameManual from "@/platform/components/GameManual";
 import ResultCard from "@/platform/roundGame/ResultCard";
 import RoundBanner from "@/platform/roundGame/RoundBanner";
 import { hint, muted, pressable, primaryButton, screen, secondaryButton } from "@/platform/roundGame/ui";
@@ -14,6 +14,7 @@ import { useRoundGame } from "@/platform/roundGame/useRoundGame";
 import { Puzzle } from "../lib/content";
 import { CLUES_PER_PUZZLE, dailyPuzzles, MAX_POINTS_PER_PUZZLE, MAX_SCORE, pointsAtClue, playFiveClues, puzzlePoints, PuzzleState, QUESTION, replay, shareLine, suggestions } from "../lib/rules";
 import { fiveClues } from "../meta";
+import { fiveCluesManual } from "../manual";
 
 export default function FiveClues() {
   const [dateKey, setDateKey] = useState(() => getUtcDateKey());
@@ -54,11 +55,7 @@ function Day({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (dateKey: s
         <GameHeader
           progress={finished ? "" : `${index + 1} of ${puzzles.length}`}
           action={
-            <HowToPlay gameId={fiveClues.id}>
-              <p className="mb-2">Each day has a person, a country and an animal to name. You start with one clue, the hardest.</p>
-              <p className="mb-2">Type a guess and pick a name from the list. A wrong guess shows the next clue, and <strong>Next clue</strong> shows it without guessing.</p>
-              <p className="text-[#ece7dc]/70">A right answer scores 250 on the first clue, then 50 less for each clue after that. Missing all five scores nothing.</p>
-            </HowToPlay>
+            <GameManual gameId={fiveClues.id} name={fiveClues.name} manual={fiveCluesManual} buttonClassName={`${pressable} min-h-8 rounded-full px-3 text-sm font-semibold text-[#1c1a16] bg-[#f4ecd8] hover:brightness-110`} />
           }
         />
         {game.loaded && !finished && states[index] && (

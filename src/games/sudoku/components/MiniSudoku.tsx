@@ -6,6 +6,7 @@ import GridGameShell from "@/platform/gridGame/GridGameShell";
 import { key } from "@/platform/gridGame/rules";
 import { useGridGame } from "@/platform/gridGame/useGridGame";
 import { sudoku } from "../meta";
+import { sudokuManual } from "../manual";
 import { BOX_COLS, BOX_ROWS, generateDailySudoku, SIZE, SUDOKU_RULES } from "../lib/generator";
 
 export default function MiniSudoku() {
@@ -61,6 +62,7 @@ function SudokuDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (date
   return (
     <GridGameShell
       info={sudoku}
+      manual={sudokuManual}
       rules={SUDOKU_RULES}
       game={game}
       dateKey={dateKey}
