@@ -5,6 +5,7 @@ import { getUtcDateKey } from "@/platform/daily";
 import StepGameShell from "@/platform/stepGame/StepGameShell";
 import { useStepGame } from "@/platform/stepGame/useStepGame";
 import { vowelPlay } from "../meta";
+import { vowelPlayManual } from "../manual";
 import {
   cleanGuess,
   ClueKind,
@@ -104,6 +105,7 @@ function VowelPlayDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (d
   return (
     <StepGameShell
       info={vowelPlay}
+      manual={vowelPlayManual}
       rules={VOWEL_PLAY_RULES}
       game={game}
       dateKey={dateKey}

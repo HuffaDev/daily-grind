@@ -7,14 +7,15 @@ import { getDailyPuzzleNumber, getUtcDateKey } from "@/platform/daily";
 import { isInDiscord } from "@/platform/discordClient";
 import { hand } from "@/platform/roundGame/fonts";
 import GameHeader from "@/platform/roundGame/GameHeader";
-import HowToPlay from "@/platform/roundGame/HowToPlay";
+import GameManual from "@/platform/components/GameManual";
 import ResultCard from "@/platform/roundGame/ResultCard";
 import RoundBanner from "@/platform/roundGame/RoundBanner";
-import { hint, panel, primaryButton, screen, secondaryButton } from "@/platform/roundGame/ui";
+import { hint, panel, pressable, primaryButton, screen, secondaryButton } from "@/platform/roundGame/ui";
 import { useRoundGame } from "@/platform/roundGame/useRoundGame";
 import { isCoastal } from "../lib/coast";
 import { aimErrors, bearing, compassName, dailyRound, MAX_POINTS_PER_TARGET, MAX_SCORE, playWhichWay, shareLine, targetPoints, TARGETS_PER_DAY } from "../lib/rules";
 import { whichWay } from "../meta";
+import { whichWayManual } from "../manual";
 import AnswerMap from "./AnswerMap";
 import { createWorld, World } from "./world";
 
@@ -114,11 +115,7 @@ function Round({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (dateKey:
         <GameHeader
           progress={finished ? "" : `${index + 1} of ${TARGETS_PER_DAY}`}
           action={
-            <HowToPlay gameId={whichWay.id}>
-              <p className="mb-2">You&apos;re holding a compass in one city. Drag on it to aim the needle at the other city, then press <strong>Lock it in</strong>.</p>
-              <p className="mb-2">The answer is the <strong>shortest route around the globe</strong>, worked out from each city&apos;s latitude and longitude. It&apos;s often not what a flat map suggests.</p>
-              <p className="text-[#ece7dc]/70">Paris to Tokyo sets off north-east over Russia, not east.</p>
-            </HowToPlay>
+            <GameManual gameId={whichWay.id} name={whichWay.name} manual={whichWayManual} buttonClassName={`${pressable} min-h-8 rounded-full px-3 text-sm font-semibold text-[#1c1a16] bg-[#f4ecd8] hover:brightness-110`} />
           }
         />
         <p className={`${hand.className} text-3xl leading-none short:text-lg`}>

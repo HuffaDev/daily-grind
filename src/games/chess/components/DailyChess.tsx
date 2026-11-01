@@ -12,8 +12,10 @@ import LaunchLink from "@/platform/components/LaunchLink";
 import Leaderboard from "@/platform/components/Leaderboard";
 import NextPuzzleCountdown from "@/platform/components/NextPuzzleCountdown";
 import ShareButton from "@/platform/components/ShareButton";
+import GameManual from "@/platform/components/GameManual";
 import ThemeToggle from "@/platform/components/ThemeToggle";
 import { chess, PUZZLE_VERSION } from "../meta";
+import { chessManual } from "../manual";
 import { fetchDailyPuzzles, postChessAction } from "../lib/api";
 import { loadDailyProgress, saveDailyProgress } from "../lib/progress";
 import { buildShareText } from "../lib/share";
@@ -320,6 +322,9 @@ function ChessDay({ dateKey, onPlayDate }: ChessDayProps) {
               {formatTime(elapsed)}
             </span>
           )}
+          <span className="short:hidden">
+            <GameManual gameId={chess.id} name={chess.name} manual={chessManual} />
+          </span>
           <span className="short:hidden">
             <ThemeToggle />
           </span>

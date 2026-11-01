@@ -6,6 +6,7 @@ import { getUtcDateKey } from "@/platform/daily";
 import StepGameShell from "@/platform/stepGame/StepGameShell";
 import { useStepGame } from "@/platform/stepGame/useStepGame";
 import { ladder } from "../meta";
+import { ladderManual } from "../manual";
 import { LADDER_RULES, LadderPuzzle, WORD_LENGTH } from "../lib/rules";
 
 export default function Ladder() {
@@ -27,6 +28,7 @@ function LadderDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (date
   return (
     <StepGameShell
       info={ladder}
+      manual={ladderManual}
       rules={LADDER_RULES}
       game={game}
       dateKey={dateKey}

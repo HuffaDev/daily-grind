@@ -8,11 +8,13 @@ import LaunchLink from "@/platform/components/LaunchLink";
 import Leaderboard from "@/platform/components/Leaderboard";
 import NextPuzzleCountdown from "@/platform/components/NextPuzzleCountdown";
 import ShareButton from "@/platform/components/ShareButton";
+import GameManual from "@/platform/components/GameManual";
 import ThemeToggle from "@/platform/components/ThemeToggle";
 import { DEFAULT_STATS, loadStats, recordGame, Stats } from "@/platform/stats";
 import { useDiscordConnection } from "@/platform/useDiscordConnection";
 import { useUtcDateKey } from "@/platform/useUtcDateKey";
 import { spectrum } from "../meta";
+import { spectrumManual } from "../manual";
 import type { GameView } from "../server/game";
 import { dailyRounds, MAX_MARK, roundPoints, ROUNDS } from "../lib/rounds";
 
@@ -157,6 +159,9 @@ function SpectrumDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (da
               Next puzzle in <NextPuzzleCountdown />
             </span>
           )}
+          <span className="short:hidden">
+            <GameManual gameId={spectrum.id} name={spectrum.name} manual={spectrumManual} />
+          </span>
           <span className="short:hidden">
             <ThemeToggle />
           </span>

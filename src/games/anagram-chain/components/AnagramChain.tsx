@@ -6,6 +6,7 @@ import { getUtcDateKey } from "@/platform/daily";
 import StepGameShell from "@/platform/stepGame/StepGameShell";
 import { useStepGame } from "@/platform/stepGame/useStepGame";
 import { anagramChain } from "../meta";
+import { anagramChainManual } from "../manual";
 import { ANAGRAM_RULES, AnagramPuzzle, currentWord, lettersLeft, stepsNeeded } from "../lib/rules";
 
 export default function AnagramChain() {
@@ -57,6 +58,7 @@ function AnagramDay({ dateKey, onPlayDate }: { dateKey: string; onPlayDate: (dat
   return (
     <StepGameShell
       info={anagramChain}
+      manual={anagramChainManual}
       rules={ANAGRAM_RULES}
       game={game}
       dateKey={dateKey}
