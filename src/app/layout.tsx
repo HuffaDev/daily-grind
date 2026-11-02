@@ -38,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {/* The proxy's nonce isn't in React's props, so hydration would report it as a mismatch. */}
-        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script suppressHydrationWarning>{THEME_INIT_SCRIPT}</script>
         {children}
       </body>
     </html>
