@@ -1,7 +1,7 @@
 import type { DiscordSDK } from "@discord/embedded-app-sdk";
 import { startPresence } from "./presence";
 import type { AllTimeEntry, GlobalEntry } from "./server/standings";
-import type { BoardEntry } from "./server/store";
+import type { BoardEntry, Theme } from "./server/store";
 
 export type { AllTimeEntry, BoardEntry, GlobalEntry };
 
@@ -46,7 +46,11 @@ export function connectDiscord(): Promise<DiscordConnection> {
 
     const data = await signIn(sdk, clientId);
     await sdk.commands.authenticate({ access_token: data.access_token });
-    const connection = { sdk, session: data.session, user: data.user };
+    // The SDK holds Discord's cross-origin window. React's dev profiler walks through
+    // enumerable props and throws when it reaches that, so sdk has to stay non-enumerable.
+    const connection = Object.defineProperty({ session: data.session, user: data.user }, "sdk", {
+      value: sdk,
+    }) as DiscordConnection;
     startPresence(connection);
     return connection;
   })();
@@ -133,6 +137,15 @@ export async function fetchAllTimeLeaderboard(conn: DiscordConnection, gameId: s
 export async function fetchGlobalLeaderboard(conn: DiscordConnection): Promise<GlobalEntry[]> {
   const data = await request<{ entries: GlobalEntry[] }>(conn, "/api/leaderboard/global");
   return data.entries;
+}
+
+export async function fetchTheme(conn: DiscordConnection): Promise<Theme | null> {
+  const data = await request<{ theme: Theme | null }>(conn, "/api/theme");
+  return data.theme;
+}
+
+export async function saveTheme(conn: DiscordConnection, theme: Theme): Promise<void> {
+  await request(conn, "/api/theme", { method: "PUT", body: JSON.stringify({ theme }) });
 }
 
 /**

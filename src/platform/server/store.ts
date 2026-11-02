@@ -17,6 +17,8 @@ export interface BoardEntry<Detail = unknown> {
   detail: Detail;
 }
 
+export type Theme = "light" | "dark";
+
 export interface Store {
   getGame<T>(gameId: string, puzzleId: string, userId: string): Promise<T | null>;
   saveGame<T>(gameId: string, puzzleId: string, userId: string, game: T): Promise<void>;
@@ -39,6 +41,9 @@ export interface Store {
    * after that. Lets a job that may run twice (a retried cron) act only once.
    */
   claimOnce(name: string, ttlSeconds: number): Promise<boolean>;
+  /** The theme a player picked, or null if they never have. Kept forever. */
+  getTheme(userId: string): Promise<Theme | null>;
+  setTheme(userId: string, theme: Theme): Promise<void>;
 }
 
 export class LockTimeoutError extends Error {}
@@ -64,6 +69,7 @@ const lockKey = (gameId: string, puzzleId: string, userId: string) => `${gameId}
 /** Hash of guild id → channel id. */
 const DAILY_CHANNELS_KEY = "bot:daily-channels";
 const claimKey = (name: string) => `claim:${name}`;
+const themeKey = (userId: string) => `theme:${userId}`;
 
 /** Waits for a per-player lock held as a Redis key, for stores that can SET NX and EVAL. */
 async function withRedisLock<T>(
@@ -145,6 +151,12 @@ function redisUrlStore(url: string, keyPrefix: string): Store {
     async claimOnce(name, ttlSeconds) {
       return (await client.send("SET", [key(claimKey(name)), "1", "NX", "EX", String(ttlSeconds)])) !== null;
     },
+    async getTheme(userId) {
+      return (await client.get(key(themeKey(userId)))) as Theme | null;
+    },
+    async setTheme(userId, theme) {
+      await client.set(key(themeKey(userId)), theme);
+    },
   };
 }
 
@@ -199,6 +211,12 @@ function upstashStore(redis: Redis): Store {
     async claimOnce(name, ttlSeconds) {
       return (await redis.set(claimKey(name), "1", { nx: true, ex: ttlSeconds })) !== null;
     },
+    async getTheme(userId) {
+      return redis.get<Theme>(themeKey(userId));
+    },
+    async setTheme(userId, theme) {
+      await redis.set(themeKey(userId), theme);
+    },
   };
 }
 
@@ -214,6 +232,7 @@ function memoryStore(): Store {
       dailyChannels: Map<string, string>;
       /** Claim name → when it expires (ms). */
       claims: Map<string, number>;
+      themes: Map<string, Theme>;
     };
   };
   g.__dailyGrindMemoryStore ??= {
@@ -223,8 +242,9 @@ function memoryStore(): Store {
     locks: new Map(),
     dailyChannels: new Map(),
     claims: new Map(),
+    themes: new Map(),
   };
-  const { games, boards, boardIndex, locks, dailyChannels, claims } = g.__dailyGrindMemoryStore;
+  const { games, boards, boardIndex, locks, dailyChannels, claims, themes } = g.__dailyGrindMemoryStore;
   // Copies on the way in and out, like a real database, so callers never share live objects.
   const boardEntries = (k: string) => structuredClone([...(boards.get(k)?.values() ?? [])]);
   return {
@@ -274,6 +294,12 @@ function memoryStore(): Store {
       if ((claims.get(name) ?? 0) > Date.now()) return false;
       claims.set(name, Date.now() + ttlSeconds * 1000);
       return true;
+    },
+    async getTheme(userId) {
+      return themes.get(userId) ?? null;
+    },
+    async setTheme(userId, theme) {
+      themes.set(userId, theme);
     },
   };
 }
