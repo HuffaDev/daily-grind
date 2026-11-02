@@ -155,6 +155,8 @@ On Windows, `start-app.cmd` and `stop-app.cmd` run the dev server in the backgro
 
 In a normal browser every game is played locally, with no leaderboard; Daily Chess still fetches its puzzles from the app's own API. With no Redis configured, the API uses an in-memory store. To also run the Redis store tests, point `TEST_REDIS_URL` at a disposable database, e.g. `TEST_REDIS_URL=redis://127.0.0.1:6379/15 bun test`.
 
+To run the bot and the Activity inside Discord, see [Testing in Discord](#testing-in-discord).
+
 ## Discord setup
 
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
@@ -172,4 +174,36 @@ In a normal browser every game is played locally, with no leaderboard; Daily Che
 10. Register the slash commands: fill in `local.env` and run `bun run register-commands`. Run it again whenever `src/bot/commands.ts` or the list of games changes. It also points the Activity's Launch command at the app.
 11. **Installation**: under Guild Install, add the scopes `applications.commands` and `bot` with the permissions **View Channels**, **Send Messages**, **Embed Links** and **Read Message History**, then use the install link to add Daily Grind to a server.
 
-For local testing inside Discord, expose `bun run dev` through a tunnel (e.g. `cloudflared tunnel --url http://localhost:3000`) and point the `/` mapping at it. `next.config.ts` already allows `*.discordsays.com` as a dev origin, which the dev server needs to accept requests coming through Discord.
+### Testing in Discord
+
+Use your own Discord app and a private test server, never the production app, because changing its `/` mapping sends every player to your test build.
+
+Copy `.env.example` to `local.env` and fill in your app's values. Plain `bun run dev` doesn't read that file, so start the server with:
+
+```bash
+bun --env-file=local.env run dev
+```
+
+| Setting | Needed for |
+|---|---|
+| `NEXT_PUBLIC_DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `SESSION_SECRET` (any long random string) | Activity sign-in |
+| `DISCORD_PUBLIC_KEY` | Launch, slash commands and buttons |
+| `DISCORD_BOT_TOKEN` | The "who's playing" card, DM sign-in, `/daily set` and `register-commands`. Launching works without it, but the log shows `DISCORD_BOT_TOKEN is not set` errors |
+| Redis | Optional. Without it, scores and saved games are gone after a server restart. If you use it, keep it separate from production |
+
+Then, in this order:
+
+1. Do steps 1 to 4 of [Discord setup](#discord-setup) for your app.
+2. Start the server, then start a tunnel in a second terminal with `cloudflared tunnel --url http://localhost:3000`. If port `3000` is taken, add `--port <port>` to the server command and use that port here. `curl -X POST https://<tunnel>/api/discord/interactions` should now get a `401`.
+3. **Activities → URL Mappings**: set `/` to the tunnel's host, without `https://`. The portal may not let you enable Activities until this is set.
+4. **Activities → Settings**: enable Activities. iOS and Android are off by default, so turn them on to test on a phone.
+5. **General Information → Interactions Endpoint URL**: set it to `https://<tunnel>/api/discord/interactions`. Discord checks it when you save, so the server and tunnel have to be running.
+6. Run `bun run register-commands`. This sends Launch to the Interactions Endpoint, so Launch fails from here on if the endpoint is unset or dead.
+7. Install the app on your test server, as in step 11 of [Discord setup](#discord-setup).
+8. Turn on Developer Mode in Discord (**User Settings → App Settings → Advanced**) and launch from the App Launcher or a voice channel's Activity shelf. Only you and your app's team can launch it.
+
+The log should show `POST /api/token 200` after launching, and `POST /api/discord/interactions 200` when you run `/leaderboard` or press **Play**.
+
+A quick tunnel gets a new URL each time `cloudflared` restarts, so you have to paste the mapping and endpoint again, there's no documented API for mappings. Restarting only the game server keeps the URL. Anyone with the URL can reach your server, so stop both when you're done. Launch then fails until you set the mapping and endpoint again.
+
+A normal browser has no sign-in or leaderboard, and it skips Discord's proxy, CSP and blocked clipboard, so test those in Discord. Stick to `next dev` for this, `next start` doesn't log requests. `next.config.ts` allows `*.discordsays.com` as a dev origin, which `next dev` needs to accept requests coming through Discord.
