@@ -36,12 +36,12 @@ export default function Hub() {
         </span>
       </header>
 
-      <ul className="grid gap-3 sm:grid-cols-2 mb-8 short:mb-2">
+      <ul className="grid gap-3 sm:grid-cols-2 sm:auto-rows-fr mb-8 short:mb-2">
         {GAMES.map((game) => (
           <li key={game.id}>
             <LaunchLink
               href={`/${game.id}`}
-              className="flex items-center gap-4 rounded-xl bg-white dark:bg-neutral-900 p-4 shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-800 hover:ring-amber-500 dark:hover:ring-amber-500 transition-shadow"
+              className="flex h-full items-center gap-4 rounded-xl bg-white dark:bg-neutral-900 p-4 shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-800 hover:ring-amber-500 dark:hover:ring-amber-500 transition-shadow"
             >
               <Image src={game.icon} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl" />
               <span>
