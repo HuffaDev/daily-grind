@@ -12,6 +12,16 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      redis:
+        image: redis:8.10.3-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -22,4 +32,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun test
+        env:
+          TEST_REDIS_URL: redis://127.0.0.1:6379/15
       - run: bun run build
