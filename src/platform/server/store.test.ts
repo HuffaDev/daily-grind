@@ -40,6 +40,15 @@ describe.if(!!url)("Redis URL store", () => {
     expect(ttl).toBeGreaterThan(0);
   });
 
+  it("keeps a player's theme, without a TTL", async () => {
+    expect(await store.getTheme("1")).toBeNull();
+    await store.setTheme("1", "light");
+    expect(await store.getTheme("1")).toBe("light");
+    expect(await store.getTheme("2")).toBeNull();
+    const ttl: number = await admin.send("TTL", [`${prefix}theme:1`]);
+    expect(ttl).toBe(-1);
+  });
+
   it("keeps boards per game and scope, without a TTL", async () => {
     await store.upsertEntry("test", "2026-10-29.v1", "guild:1", entry("1", 10));
     await store.upsertEntry("test", "2026-10-30.v1", "guild:1", entry("1", 20));
