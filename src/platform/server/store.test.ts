@@ -6,6 +6,9 @@ import { BoardEntry, createRedisUrlStore } from "./store";
 // Each run uses its own key prefix and deletes its keys afterwards.
 const url = process.env.TEST_REDIS_URL;
 
+// Fails CI instead of letting a missing URL skip these tests without anyone noticing.
+if (process.env.CI && !url) throw new Error("TEST_REDIS_URL must be set in CI");
+
 describe.if(!!url)("Redis URL store", () => {
   const prefix = `test:${crypto.randomUUID()}:`;
   const store = createRedisUrlStore(url!, prefix);
