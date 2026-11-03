@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
-// Runs before hydration so the correct theme class is present for first
-// paint — avoids a flash of the wrong theme and any hydration mismatch.
+// Inline in the HTML so it runs before first paint. next/script would re-create
+// it from JavaScript instead, without the nonce Discord's proxy adds to inline
+// scripts in the HTML, and a nonce-based CSP blocks that copy.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
@@ -37,9 +37,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {THEME_INIT_SCRIPT}
-        </Script>
+        {/* The proxy's nonce isn't in React's props, so hydration would report it as a mismatch. */}
+        <script suppressHydrationWarning>{THEME_INIT_SCRIPT}</script>
         {children}
       </body>
     </html>

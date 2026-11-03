@@ -41,6 +41,7 @@ src/
       games/ladder/, games/anagram-chain/, games/heist/, games/vowel-play/   (GET: the day's puzzle, no sign-in needed)
       games/spectrum/
       presence/           the Activity reporting who's in it, for the bot's "playing" card
+      theme/              the light/dark choice saved for each Discord player
       discord/interactions/  the bot's slash commands and buttons
       cron/daily/         the daily post, run by Vercel Cron
   bot/                    the Discord bot
